@@ -1,0 +1,22 @@
+{
+  "name": "tokiti-bot-poc",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "seed": "npm run seed -w apps/api",
+    "test": "node --disable-warning=ExperimentalWarning --import tsx --test \"packages/core/test/*.test.ts\" \"apps/api/test/*.test.ts\" \"evals/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "eval": "node --disable-warning=ExperimentalWarning --import tsx evals/run.ts",
+    "shortlist": "node --import tsx evals/shortlist.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "concurrently": "^9.1.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "_note": "SAMPLE DATA. Copied from public seed files in tokiti-web dated 27 Oct 2026. Every value needs Kin's confirmation before real use.",
+  "products": [
+    { "sku": "TK101", "name": "TOKITI Nest ที่นอนแมว", "color": "Snow White", "regular_price": 899, "online_price": 590, "booth_price": 490, "spec_id": "nest", "needs_review": true },
+    { "sku": "TK102", "name": "TOKITI Nest ที่นอนแมว", "color": "Latte Beige", "regular_price": 899, "online_price": 590, "booth_price": 490, "spec_id": "nest", "needs_review": true },
+    { "sku": "TK103", "name": "TOKITI Nest ที่นอนแมว", "color": "Sakura Pink", "regular_price": 899, "online_price": 590, "booth_price": 490, "spec_id": "nest", "needs_review": true },
+    { "sku": "TK201", "name": "TOKITI Lounge ที่ลับเล็บ เดี่ยว", "color": null, "regular_price": null, "online_price": 129, "booth_price": null, "spec_id": "lounge", "needs_review": true },
+    { "sku": "TK301", "name": "ไม้ตกแมว TOKITI", "color": null, "regular_price": 179, "online_price": 134, "booth_price": 119, "spec_id": "wand", "needs_review": true }
+  ],
+  "promotions": [
+    { "id": "lounge-pack", "title": "TOKITI Lounge แพ็ก 2 ชิ้น", "detail": "ออนไลน์ 194 บาท (ปกติ 259 บาท) หน้างาน 159 บาท", "channel": "all", "starts_at": "2026-10-27", "ends_at": null, "needs_review": true },
+    { "id": "duo-set", "title": "Purr Duo set", "detail": "TOKITI Nest 1 + TOKITI Lounge 2 ชิ้น ราคาเปิดตัว 749 บาท (ปกติ 1,158 บาท) เฉพาะออนไลน์ เลือกสีที่นอนได้ 3 สี", "channel": "online", "starts_at": "2026-10-27", "ends_at": null, "needs_review": true },
+    { "id": "trio-set", "title": "Purrfect Trio set", "detail": "TOKITI Nest 1 + TOKITI Lounge 2 ชิ้น + ไม้ตกแมว 1 ราคาเปิดตัว 859 บาท (ปกติ 1,353 บาท) เฉพาะออนไลน์ เลือกสีที่นอนได้ 3 สี", "channel": "online", "starts_at": "2026-10-27", "ends_at": null, "needs_review": true }
+  ],
+  "specs": [
+    { "id": "nest", "name": "TOKITI Nest", "size": null, "weight_limit": null, "pet_suitability": "ออกแบบสำหรับแมว ยังไม่มีข้อมูลยืนยันการใช้กับสุนัข", "material": null, "care": "ขึ้นรูปชิ้นเดียว ไม่มีรอยต่อ ล้างน้ำได้ แห้งไว น้ำยาทำความสะอาดและการตากแดดต้องให้ทีมยืนยัน", "features": "มี 3 สี Snow White, Latte Beige และ Sakura Pink ทรงหลุมโอบตัว ขอบไล่ระดับ ฐานยกสูง รูด้านข้างช่วยระบายอากาศ ด้านข้างสวม Lounge ได้ ด้านบนติดไม้ตกแมวได้", "needs_review": true },
+    { "id": "lounge", "name": "TOKITI Lounge", "size": null, "weight_limit": null, "pet_suitability": "ที่ลับเล็บสำหรับแมว สวมขอบ TOKITI Nest", "material": null, "care": null, "features": "สวมด้านข้างของ TOKITI Nest", "needs_review": true },
+    { "id": "wand", "name": "ไม้ตกแมว TOKITI", "size": null, "weight_limit": null, "pet_suitability": "ของเล่นแมว", "material": null, "care": null, "features": "ติดด้านบนของ TOKITI Nest", "needs_review": true }
+  ],
+  "faqs": [
+    { "id": "shipping", "topic": "ค่าส่งและเวลาจัดส่ง", "content": "ค่าส่งคิดตามสินค้าและรหัสไปรษณีย์ปลายทาง ดูยอดล่าสุดในตะกร้าก่อนชำระ ขนส่งที่ใช้คือ SPX Express และ DHL eCommerce งานออนไลน์ส่งจากโกดังเชียงใหม่ ยังไม่มีระยะเวลาจัดส่งที่ร้านยืนยัน ห้ามสัญญาวันถึง", "needs_review": true },
+    { "id": "ordering", "topic": "วิธีสั่งซื้อ", "content": "เลือกสินค้าหรือเซ็ตและสี ใส่ตะกร้า กรอกที่อยู่ ตรวจส่วนลดและค่าส่ง ยืนยันออเดอร์ แล้วแนบหลักฐานการชำระเงินที่ https://backoffice-console.vercel.app/shop/tokiti", "needs_review": true },
+    { "id": "track", "topic": "ติดตามออเดอร์", "content": "ลูกค้าดูออเดอร์และเลขพัสดุของตัวเองได้ที่ https://backoffice-console.vercel.app/shop/tokiti?view=orders", "needs_review": true },
+    { "id": "payment", "topic": "การชำระเงิน", "content": "ข้อความหรือรูปสลิปยังไม่ใช่การยืนยันว่าได้รับเงิน ทีมงานต้องตรวจก่อนเสมอ", "needs_review": true },
+    { "id": "hygiene", "topic": "ขอบเขตเรื่องสุขอนามัย", "content": "คุณสมบัติของที่นอนช่วยให้ดูแลความสะอาดง่าย แต่ไม่ใช่ผลทดสอบว่าป้องกันหรือรักษาเชื้อรา หากน้องมีอาการที่สงสัยควรพบสัตวแพทย์", "needs_review": true },
+    { "id": "reviews", "topic": "รีวิวสินค้า", "content": "ดูรีวิวและบรรยากาศลูกค้าได้ที่ช่องทาง @tokiti.official บน Instagram, Facebook และ TikTok", "needs_review": true }
+  ],
+  "settings": {
+    "enabled": true,
+    "bot_hours": { "start": "23:00", "end": "09:00" },
+    "topics": ["price_promo", "delivery", "size_weight", "stock_restock", "order_tracking", "image", "review"],
+    "min_confidence": 0.7
+  },
+  "stock": [
+    { "sku": "TK101", "status": "in_stock", "restock_date": null },
+    { "sku": "TK102", "status": "in_stock", "restock_date": null },
+    { "sku": "TK103", "status": "out_of_stock", "restock_date": "2026-11-20" },
+    { "sku": "TK201", "status": "on_hold", "restock_date": null },
+    { "sku": "TK301", "status": "in_stock", "restock_date": null }
+  ],
+  "orders": [
+    { "customer_id": "demo-a", "code": "WEB-DEMO-0001", "state": "กำลังจัดส่ง", "carrier": "SPX Express", "tracking": "DEMO123456" },
+    { "customer_id": "demo-b", "code": "WEB-DEMO-0002", "state": "รอตรวจการชำระเงิน", "carrier": null, "tracking": null }
+  ]
+}
