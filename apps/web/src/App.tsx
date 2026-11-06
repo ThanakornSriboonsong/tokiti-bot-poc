@@ -73,7 +73,10 @@ function ResultCard({ result }: { result: BotResult }) {
       <div className="row">
         <span className="tag">{result.action === "handoff" ? "ส่งต่อทีมงาน" : result.action === "ask_followup" ? "ถามกลับ" : "ตอบ"}</span>
         <span className="tag">{TOPIC_LABELS[result.topic]}</span>
-        <span className="muted small">ความมั่นใจ {Math.round(result.confidence * 100)}% · {result.latency_ms} ms</span>
+        <span className="muted small">
+          ความมั่นใจ {Math.round(result.confidence * 100)}% · {result.latency_ms} ms
+          {result.history_count > 0 ? ` · ใช้ประวัติแชท ${result.history_count} ข้อความ` : ""}
+        </span>
       </div>
       <p className="reply">{result.reply}</p>
       {result.blocked_by.length > 0 && (
@@ -126,6 +129,16 @@ function ChatPage() {
     }
   };
 
+  const resetChat = async () => {
+    setError(null);
+    try {
+      await api("/chat/reset", "POST", { customer_id: customer });
+      setHistory([]);
+    } catch (cause) {
+      setError((cause as Error).message);
+    }
+  };
+
   const pickImage = (file: File | undefined) => {
     if (!file) return;
     const reader = new FileReader();
@@ -153,6 +166,7 @@ function ChatPage() {
         <button className="primary" disabled={busy || (!text.trim() && !image)} onClick={send}>
           {busy ? "กำลังถาม..." : "ส่ง"}
         </button>
+        <button onClick={resetChat}>เริ่มแชทใหม่</button>
       </div>
       {image && <img className="thumb" src={image} alt="รูปที่แนบ" />}
       {error && <p className="error">{error}</p>}

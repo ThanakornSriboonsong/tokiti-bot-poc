@@ -116,6 +116,42 @@ test("telemetry reports decisions, gaps and stock reads", async () => {
   assert.equal(json.stock_reads.failed, 1);
 });
 
+test("follow-ups see earlier messages, but only replies the customer received", async () => {
+  const db = openDb(":memory:");
+  seedDb(db);
+  const prompts: string[] = [];
+  const recording: ModelProvider = {
+    complete: async (request) => {
+      prompts.push(JSON.stringify(request.messages.at(-1)));
+      return model.complete(request);
+    },
+  };
+  const app = createApp({ db, model: recording, now: () => NIGHT });
+  const post = async (path: string, body: unknown) => {
+    const response = await app.request(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    return (await response.json()) as Json;
+  };
+
+  const first = await post("/api/chat", { text: "มีโปรไหม", customer_id: "demo-a" });
+  const second = await post("/api/chat", { text: "ขอดูอีกที", customer_id: "demo-a" });
+  assert.match(prompts[1]!, /มีโปรไหม/);
+  assert.doesNotMatch(prompts[1]!, /749/, "a pending draft was never sent");
+  assert.equal(second.result.history_count, 1);
+
+  await post(`/api/queue/${first.id}/decision`, { decision: "approve" });
+  await post(`/api/queue/${second.id}/decision`, { decision: "reject" });
+  await post("/api/chat", { text: "แล้วราคาเท่าไหร่", customer_id: "demo-a" });
+  assert.match(prompts[2]!, /749/, "an approved reply was sent");
+  assert.equal(prompts[2]!.split("749").length, 2, "a rejected draft stays out");
+
+  await post("/api/chat", { text: "อีกคน", customer_id: "demo-b" });
+  assert.doesNotMatch(prompts[3]!, /มีโปรไหม/, "chats stay separate per customer");
+
+  await post("/api/chat/reset", { customer_id: "demo-a" });
+  const fresh = await post("/api/chat", { text: "เริ่มใหม่", customer_id: "demo-a" });
+  assert.equal(fresh.result.history_count, 0);
+});
+
 test("a password protects everything except the health check", async () => {
   const db = openDb(":memory:");
   seedDb(db);

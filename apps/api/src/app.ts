@@ -2,12 +2,14 @@ import type { DatabaseSync } from "node:sqlite";
 import { Hono } from "hono";
 import { basicAuth } from "hono/basic-auth";
 import {
+  MAX_HISTORY_TURNS,
   SampleStockProvider,
   answerMessage,
   bangkokDate,
   gateReason,
   recheckStock,
   type BotResult,
+  type HistoryTurn,
   type ModelProvider,
   type Order,
   type OrderProvider,
@@ -68,6 +70,22 @@ function orderProvider(db: DatabaseSync): OrderProvider {
         .all(customerId) as unknown as Order[];
     },
   };
+}
+
+/**
+ * Customer messages always count. A shop reply counts only once staff approve or edit it,
+ * because the customer never sees a pending or rejected draft.
+ */
+function loadHistory(db: DatabaseSync, customerId: string): HistoryTurn[] {
+  const reset = db.prepare("select value from kv where key = ?").get(`history_reset:${customerId}`) as { value: string } | undefined;
+  const rows = db
+    .prepare("select * from replies where customer_id = ? and created_at > ? order by id desc limit ?")
+    .all(customerId, reset?.value ?? "", MAX_HISTORY_TURNS) as unknown as ReplyRow[];
+  return rows.reverse().flatMap((row) => {
+    const customer: HistoryTurn = { role: "customer", text: row.text || "(ส่งรูป)", at: row.created_at };
+    if (row.final_text === null) return [customer];
+    return [customer, { role: "shop", text: row.final_text, at: row.decided_at ?? row.created_at } satisfies HistoryTurn];
+  });
 }
 
 interface ReplyRow {
@@ -176,6 +194,7 @@ export function createApp({ db, model, stock, now = () => new Date(), password, 
       stock: stockProvider,
       orders,
       now: current,
+      history: loadHistory(db, customerId),
     });
 
     if (preview) return c.json({ preview: true, result });
@@ -183,6 +202,17 @@ export function createApp({ db, model, stock, now = () => new Date(), password, 
       .prepare("insert into replies(customer_id, text, has_image, version_id, result, created_at) values (?, ?, ?, ?, ?, ?)")
       .run(customerId, text, body.image_url ? 1 : 0, published.id, JSON.stringify(result), current.toISOString());
     return c.json({ id: Number(saved.lastInsertRowid), version_id: published.id, result });
+  });
+
+  // Testers can start a clean chat. Past replies stay in the queue and telemetry.
+  app.post("/api/chat/reset", async (c) => {
+    const body = (await c.req.json()) as { customer_id?: string };
+    if (!body.customer_id) return c.json({ error: "customer_required" }, 400);
+    db.prepare("insert into kv(key, value) values (?, ?) on conflict(key) do update set value = excluded.value").run(
+      `history_reset:${body.customer_id}`,
+      now().toISOString(),
+    );
+    return c.json({ ok: true });
   });
 
   app.get("/api/queue", (c) => {

@@ -33,6 +33,11 @@ function argument(name: string): string | undefined {
   return index === -1 ? undefined : process.argv[index + 1];
 }
 
+function averageCost(rows: { result: BotResult }[]): number | null {
+  const costs = rows.flatMap((row) => (row.result.usage.cost === null ? [] : [row.result.usage.cost]));
+  return costs.length ? (costs.reduce((sum, value) => sum + value, 0) / costs.length) * 1000 : null;
+}
+
 export function score(item: EvalCase, result: BotResult, allowedPrices: Set<string>): string[] {
   const failures: string[] = [];
   const reply = result.reply;
@@ -62,7 +67,12 @@ async function runModel(model: string, cases: EvalCase[], apiKey: string) {
   await Promise.all(
     Array.from({ length: CONCURRENCY }, async () => {
       for (let item = queue.shift(); item; item = queue.shift()) {
-        const result = await answerMessage({ text: item.text }, item.customer ?? "demo-a", { snapshot: seed, model: provider, stock, orders, now: NOW });
+        const history = (item.history ?? []).map((text, index) => ({
+          role: index % 2 === 0 ? ("customer" as const) : ("shop" as const),
+          text,
+          at: new Date(NOW.getTime() - 60_000).toISOString(),
+        }));
+        const result = await answerMessage({ text: item.text }, item.customer ?? "demo-a", { snapshot: seed, model: provider, stock, orders, now: NOW, history });
         rows.push({ item, result, failures: score(item, result, allowedPrices) });
       }
     }),
@@ -85,6 +95,8 @@ async function runModel(model: string, cases: EvalCase[], apiKey: string) {
       latency_p50_ms: latencies[Math.floor(latencies.length * 0.5)] ?? null,
       latency_p95_ms: latencies[Math.floor(latencies.length * 0.95)] ?? null,
       usd_per_1000: costs.length ? (costs.reduce((sum, value) => sum + value, 0) / costs.length) * 1000 : null,
+      usd_per_1000_followups: averageCost(rows.filter((row) => row.item.history)),
+      usd_per_1000_new_chats: averageCost(rows.filter((row) => !row.item.history)),
     },
     failures: rows.filter((row) => row.failures.length > 0).map((row) => ({
       id: row.item.id,

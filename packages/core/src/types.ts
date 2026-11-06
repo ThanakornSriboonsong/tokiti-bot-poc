@@ -150,6 +150,13 @@ export interface CustomerMessage {
   image_url?: string;
 }
 
+/** An earlier chat message. `shop` means a reply the customer actually received. */
+export interface HistoryTurn {
+  role: "customer" | "shop";
+  text: string;
+  at: string;
+}
+
 export interface BotResult {
   action: Action;
   topic: Topic;
@@ -163,5 +170,6 @@ export interface BotResult {
   usage: Usage;
   model: string | null;
   latency_ms: number;
+  history_count: number;
   error?: string;
 }

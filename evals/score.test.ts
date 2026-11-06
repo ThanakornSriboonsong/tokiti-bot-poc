@@ -17,6 +17,7 @@ const result = (overrides: Partial<BotResult>): BotResult => ({
   usage: { prompt_tokens: 0, completion_tokens: 0, cost: null },
   model: null,
   latency_ms: 0,
+  history_count: 0,
   ...overrides,
 });
 
