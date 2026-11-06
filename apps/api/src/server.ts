@@ -1,5 +1,8 @@
 import { serve } from "@hono/node-server";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { OpenRouterProvider, TokitiStockProvider, type ModelProvider, type StockProvider } from "@tokiti/core";
+import { existsSync } from "node:fs";
+import { relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApp } from "./app.ts";
 import { DB_PATH, openDb, seedDb } from "./db.ts";
@@ -31,7 +34,28 @@ if (process.env.STOCK_PROVIDER === "tokiti") {
   stock = new TokitiStockProvider(TOKITI_STOCK_URL, TOKITI_STOCK_KEY);
 }
 
+const hostname = process.env.HOST ?? "127.0.0.1";
+const password = process.env.APP_PASSWORD;
+const isLocal = hostname === "127.0.0.1" || hostname === "localhost";
+if (!isLocal && !password) throw new Error("APP_PASSWORD is required when HOST is not local");
+
+const dailyChatLimit = process.env.DAILY_CHAT_LIMIT ? Number(process.env.DAILY_CHAT_LIMIT) : undefined;
+const app = createApp({
+  db,
+  model,
+  ...(stock ? { stock } : {}),
+  ...(password ? { password } : {}),
+  ...(dailyChatLimit === undefined ? {} : { dailyChatLimit }),
+});
+
+// A hosted copy serves the built control web from this one server.
+const webRoot = relative(process.cwd(), fileURLToPath(new URL("../../web/dist", import.meta.url))).replaceAll("\\", "/");
+if (existsSync(webRoot)) {
+  app.use("/*", serveStatic({ root: webRoot }));
+  app.get("*", serveStatic({ path: `${webRoot}/index.html` }));
+}
+
 const port = Number(process.env.PORT ?? 8787);
-serve({ fetch: createApp({ db, model, ...(stock ? { stock } : {}) }).fetch, port, hostname: "127.0.0.1" }, () => {
-  console.log(`API on http://127.0.0.1:${port} (model ${model ? "configured" : "not configured"})`);
+serve({ fetch: app.fetch, port, hostname }, () => {
+  console.log(`API on http://${hostname}:${port} (model ${model ? "configured" : "not configured"})`);
 });

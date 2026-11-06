@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: tokiti-bot-poc
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    autoDeploy: false
+    buildCommand: npm ci --include=dev && npm run build -w apps/web
+    startCommand: node --disable-warning=ExperimentalWarning --import tsx apps/api/src/server.ts
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 22.16.0
+      - key: HOST
+        value: 0.0.0.0
+      - key: OPENROUTER_MODEL
+        value: anthropic/claude-haiku-5.5
+      - key: OPENROUTER_FALLBACK_MODEL
+        value: z-ai/glm-5.3-flash
+      - key: STOCK_PROVIDER
+        value: sample
+      - key: DAILY_CHAT_LIMIT
+        value: "200"
+      # Render asks for these two when the Blueprint is created. They never go in git.
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: APP_PASSWORD
+        sync: false

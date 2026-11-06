@@ -1,8 +1,10 @@
 import type { DatabaseSync } from "node:sqlite";
 import { Hono } from "hono";
+import { basicAuth } from "hono/basic-auth";
 import {
   SampleStockProvider,
   answerMessage,
+  bangkokDate,
   gateReason,
   recheckStock,
   type BotResult,
@@ -24,6 +26,10 @@ export interface AppDeps {
   model: ModelProvider | null;
   stock?: StockProvider;
   now?: () => Date;
+  /** Required on any hosted copy. Login is the username `tokiti` with this password. */
+  password?: string;
+  /** Caps bot calls per Bangkok day, so a shared link can't drain the OpenRouter credit. */
+  dailyChatLimit?: number;
 }
 
 export function sampleStock(db: DatabaseSync): StockProvider {
@@ -85,10 +91,16 @@ const toReply = (row: ReplyRow) => ({
   stock_flag: row.stock_flag ? JSON.parse(row.stock_flag) : null,
 });
 
-export function createApp({ db, model, stock, now = () => new Date() }: AppDeps) {
+export function createApp({ db, model, stock, now = () => new Date(), password, dailyChatLimit }: AppDeps) {
   const app = new Hono();
   const stockProvider = loggedStock(db, stock ?? sampleStock(db));
   const orders = orderProvider(db);
+  const chatsByDay = new Map<string, number>();
+
+  // Render's health check can't log in, so this one route stays open and reveals nothing.
+  app.get("/healthz", (c) => c.text("ok"));
+
+  if (password) app.use("*", basicAuth({ username: "tokiti", password }));
 
   app.get("/api/status", (c) =>
     c.json({ model_configured: model !== null, published_version: getPublished(db).id }),
@@ -138,6 +150,14 @@ export function createApp({ db, model, stock, now = () => new Date() }: AppDeps)
     if (!text && !body.image_url) return c.json({ error: "empty_message" }, 400);
     if (body.image_url && body.image_url.length > MAX_IMAGE_CHARS) return c.json({ error: "image_too_large" }, 413);
     if (!model) return c.json({ error: "model_not_configured" }, 503);
+
+    if (dailyChatLimit !== undefined) {
+      const day = bangkokDate(now());
+      const used = chatsByDay.get(day) ?? 0;
+      if (used >= dailyChatLimit) return c.json({ error: "daily_limit_reached" }, 429);
+      chatsByDay.clear();
+      chatsByDay.set(day, used + 1);
+    }
 
     const published = getPublished(db);
     const preview = body.preview === true;

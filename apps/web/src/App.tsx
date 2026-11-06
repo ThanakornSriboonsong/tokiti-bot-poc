@@ -114,7 +114,12 @@ function ChatPage() {
       setImage(null);
     } catch (cause) {
       const message = (cause as Error).message;
-      setError(message === "model_not_configured" ? "ยังไม่ได้ตั้ง OPENROUTER_API_KEY และ OPENROUTER_MODEL ใน .env" : message);
+      const messages: Record<string, string> = {
+        model_not_configured: "ยังไม่ได้ตั้ง OPENROUTER_API_KEY และ OPENROUTER_MODEL",
+        daily_limit_reached: "ใช้ครบโควตาทดสอบของวันนี้แล้ว ลองใหม่พรุ่งนี้",
+        image_too_large: "รูปใหญ่เกินไป",
+      };
+      setError(messages[message] ?? message);
     } finally {
       setBusy(false);
     }

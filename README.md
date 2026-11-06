@@ -34,6 +34,12 @@ Open http://127.0.0.1:5173. Without a key, everything works except getting an an
 
 Eval results are saved in `evals/results/`.
 
+## Hosted test copy
+
+`render.yaml` deploys one Render web service that serves both the API and the control web. It needs two secrets, set only in Render: `OPENROUTER_API_KEY` and `APP_PASSWORD`. The login username is `tokiti`.
+
+The server refuses to start on a public address without `APP_PASSWORD`, and `DAILY_CHAT_LIMIT` caps bot calls per day. On Render's free plan, the app sleeps when idle and resets to sample data on every restart, including its telemetry and edits. Pushes don't deploy on their own, so use **Manual Deploy** in Render.
+
 ## Layout
 
 ```text
@@ -49,4 +55,4 @@ evals/          Test questions, scoring and model shortlist
 - **Sample data:** every value comes from tokiti-web seed files dated 27 Oct 2026 and needs Kin's confirmation. Prices may be out of date, and stock and orders are invented.
 - **Live stock:** `TokitiStockProvider` is ready but off. It needs a read-only endpoint in Tokiti that returns availability by SKU, which needs Kin's approval. Never use the Supabase service-role key here.
 - **Privacy:** requests set OpenRouter's `data_collection: "deny"`, and the POC should only receive sample data. Don't use real customer messages or images without Kin's approval.
-- **Not production ready:** the API has no login and only listens on your own computer.
+- **Not production ready:** one shared password protects the hosted copy, and there are no individual accounts or roles.

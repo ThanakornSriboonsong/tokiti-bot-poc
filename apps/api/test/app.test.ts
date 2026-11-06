@@ -116,6 +116,29 @@ test("telemetry reports decisions, gaps and stock reads", async () => {
   assert.equal(json.stock_reads.failed, 1);
 });
 
+test("a password protects everything except the health check", async () => {
+  const db = openDb(":memory:");
+  seedDb(db);
+  const app = createApp({ db, model, password: "secret-test-value" });
+  const login = { authorization: `Basic ${btoa("tokiti:secret-test-value")}` };
+  const wrong = { authorization: `Basic ${btoa("tokiti:wrong")}` };
+
+  assert.equal((await app.request("/healthz")).status, 200);
+  assert.equal((await app.request("/api/status")).status, 401);
+  assert.equal((await app.request("/api/status", { headers: wrong })).status, 401);
+  assert.equal((await app.request("/api/status", { headers: login })).status, 200);
+  assert.equal((await app.request("/anything")).status, 401);
+});
+
+test("the daily chat limit stops further model calls", async () => {
+  const db = openDb(":memory:");
+  seedDb(db);
+  const app = createApp({ db, model, now: () => NIGHT, dailyChatLimit: 1 });
+  const ask = () => app.request("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: "มีโปรไหม" }) });
+  assert.equal((await ask()).status, 200);
+  assert.equal((await ask()).status, 429);
+});
+
 test("the bot reports when no model is configured", async () => {
   const db = openDb(":memory:");
   seedDb(db);
