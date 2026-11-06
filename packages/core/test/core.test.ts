@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   HANDOFF_REPLY,
+  OpenRouterProvider,
   SampleStockProvider,
   TokitiStockProvider,
   answerMessage,
@@ -237,6 +238,35 @@ test("a failing live stock read reports unknown", async () => {
     const provider = new TokitiStockProvider("https://example.test/stock", "key");
     const [item] = await provider.getStock(["TK101"]);
     assert.equal(item?.status, "unknown");
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("model errors never expose the API key", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => {
+    throw new TypeError('Headers.append: "Bearer sk-or-v1-secret" is an invalid header value.');
+  };
+  try {
+    const model = new OpenRouterProvider({ apiKey: "sk-or-v1-secret", model: "test/model" });
+    const result = await answerMessage({ text: "ราคา" }, "a", { snapshot, model, stock: stockOf("in_stock"), orders: noOrders, now: NOW });
+    assert.equal(result.error, "openrouter_request_failed: TypeError");
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("a stray newline in the key is removed", async () => {
+  const original = globalThis.fetch;
+  let header = "";
+  globalThis.fetch = async (_url, init) => {
+    header = new Headers(init?.headers).get("authorization") ?? "";
+    return new Response(JSON.stringify({ choices: [{ message: { content: "{}" } }] }));
+  };
+  try {
+    await new OpenRouterProvider({ apiKey: " key-value\n", model: "test/model" }).complete({ messages: [], tools: [], schema: {} });
+    assert.equal(header, "Bearer key-value");
   } finally {
     globalThis.fetch = original;
   }

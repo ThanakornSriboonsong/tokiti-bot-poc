@@ -79,6 +79,7 @@ function ResultCard({ result }: { result: BotResult }) {
       {result.blocked_by.length > 0 && (
         <p className="small error">ถูกกันไว้: {result.blocked_by.map((reason) => REASON_LABELS[reason] ?? reason).join(", ")}</p>
       )}
+      {result.error && <p className="small error">รายละเอียด: {result.error}</p>}
       {result.model_reply && result.model_reply !== result.reply && <p className="small muted">ร่างจากโมเดล: {result.model_reply}</p>}
       {result.source_ids.length > 0 && <p className="small muted">แหล่งข้อมูล: {result.source_ids.join(", ")}</p>}
       {result.stock_checks.length > 0 && (

@@ -25,9 +25,10 @@ export class OpenRouterProvider implements ModelProvider {
 
   async complete(request: ModelRequest): Promise<ModelResponse> {
     const { apiKey, model, fallbackModel, timeoutMs = 30_000 } = this.config;
-    const response = await fetch(OPENROUTER_URL, {
+    const send = fetch(OPENROUTER_URL, {
       method: "POST",
-      headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+      // Pasted keys often carry a stray newline or space, which makes the header invalid.
+      headers: { authorization: `Bearer ${apiKey.trim()}`, "content-type": "application/json" },
       body: JSON.stringify({
         models: fallbackModel ? [model, fallbackModel] : [model],
         messages: request.messages,
@@ -41,6 +42,10 @@ export class OpenRouterProvider implements ModelProvider {
         provider: { require_parameters: true, data_collection: "deny" },
       }),
       signal: AbortSignal.timeout(timeoutMs),
+    });
+    // Node can quote the header value in its error, so only the error's name is passed on.
+    const response = await send.catch((cause: Error) => {
+      throw new Error(`openrouter_request_failed: ${cause.name}`);
     });
     const body = (await response.json().catch(() => ({}))) as OpenRouterBody;
     if (!response.ok || body.error) {
