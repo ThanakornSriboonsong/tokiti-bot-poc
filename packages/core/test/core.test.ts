@@ -9,6 +9,7 @@ import {
   answerMessage,
   buildSources,
   checkAnswer,
+  claimsStock,
   classifyAvailability,
   customerRiskReasons,
   extractPrices,
@@ -226,6 +227,18 @@ test("low confidence and missing sources hand off", () => {
 
 test("a stock claim without a live read is blocked", () => {
   assert.ok(check({ reply_th: "มีของค่ะ" }).includes("stock_without_live_read"));
+});
+
+test("offering to check stock is not a stock claim", () => {
+  const asks = [
+    "ชอบสีไหนบอกได้เลยค่ะ ถ้าอยากเช็กว่าสีนั้นพร้อมส่งไหม แจ้งมาได้เลยค่ะ 🐱",
+    "อยากรู้ว่ามีของอยู่ไหม บอกสีมาได้เลยนะคะ",
+    "สนใจสีไหนคะ เดี๋ยวดูให้ว่าของเข้าหรือยัง",
+  ];
+  for (const reply of asks) assert.equal(claimsStock(reply), false, reply);
+
+  const claims = ["มีของค่ะ สนใจไหม", "สีชมพูหมดแล้วค่ะ", "พร้อมส่งเลยค่ะ อยากได้สีไหน"];
+  for (const reply of claims) assert.equal(claimsStock(reply), true, reply);
 });
 
 test("storefront availability rule", () => {

@@ -61,7 +61,16 @@ const FORBIDDEN_REPLY: { pattern: RegExp; reason: string }[] = [
 ];
 
 // The lookahead keeps product talk like "มีของใช้สำหรับน้องแมว" from counting as a stock claim.
-const STOCK_CLAIM = /พร้อมส่ง|มีของ(?!ใช้|เล่น|แถม)|มีสินค้า(?!ให้เลือก)|ยังมีของ|ยังมีสินค้า|ของเข้า|สินค้าหมด|ของหมด|หมดแล้ว/;
+const STOCK_WORDS = "พร้อมส่ง|มีของ(?!ใช้|เล่น|แถม)|มีสินค้า(?!ให้เลือก)|ยังมีของ|ยังมีสินค้า|ของเข้า|สินค้าหมด|ของหมด|หมดแล้ว";
+const STOCK_CLAIM = new RegExp(STOCK_WORDS);
+// "พร้อมส่งไหม" asks about stock rather than stating it. Only "อยู่" or "แล้ว" may sit in
+// between, so a statement like "มีของค่ะ สนใจไหม" is still treated as a claim.
+const STOCK_QUESTION = new RegExp(`(?:${STOCK_WORDS})(?:อยู่|แล้ว)?\\s*(?:ไหม|มั้ย|หรือเปล่า|รึเปล่า|หรือยัง)`, "g");
+
+/** True when the reply states stock, ignoring places where it only asks about stock. */
+export function claimsStock(reply: string): boolean {
+  return STOCK_CLAIM.test(reply.replace(STOCK_QUESTION, " "));
+}
 
 export interface SafetyInput {
   answer: ModelAnswer;
@@ -108,7 +117,7 @@ export function checkAnswer({ answer, customerText, sources, stockChecks, settin
   }
 
   const citesStock = answer.source_ids.some((id) => id.startsWith("stock:"));
-  if ((answer.topic === "stock_restock" || STOCK_CLAIM.test(reply)) && !citesStock) {
+  if ((answer.topic === "stock_restock" || claimsStock(reply)) && !citesStock) {
     reasons.push("stock_without_live_read");
   }
   if (stockChecks.some((item) => item.status === "unknown")) reasons.push("stock_unknown");
