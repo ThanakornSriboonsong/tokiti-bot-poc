@@ -214,6 +214,11 @@ test("handoff rules leave normal questions alone", () => {
   for (const text of normal) assert.deepEqual(customerRiskReasons(text), [], text);
 });
 
+test("a low-confidence question back is allowed, but its numbers are still checked", () => {
+  assert.deepEqual(check({ action: "ask_followup", confidence: 0.3, source_ids: [], reply_th: "หมายถึงที่นอนแมวใช่ไหมคะ" }), []);
+  assert.ok(check({ action: "ask_followup", confidence: 0.3, source_ids: [], reply_th: "ราคา 450 บาทใช่ไหมคะ" }).includes("price_not_in_source"));
+});
+
 test("low confidence and missing sources hand off", () => {
   assert.ok(check({ confidence: 0.2 }).includes("low_confidence"));
   assert.ok(check({ source_ids: [] }).includes("no_source"));

@@ -81,7 +81,8 @@ export function checkAnswer({ answer, customerText, sources, stockChecks, settin
   if (answer.action === "handoff") return reasons;
 
   if (answer.topic !== "other" && !settings.topics.includes(answer.topic)) reasons.push("topic_disabled");
-  if (answer.confidence < settings.min_confidence) reasons.push("low_confidence");
+  // A question back states no facts, so the bot may ask even when unsure. The number checks still apply.
+  if (answer.action === "answer" && answer.confidence < settings.min_confidence) reasons.push("low_confidence");
 
   const unknownIds = answer.source_ids.filter((id) => !sources.has(id));
   if (unknownIds.length > 0) reasons.push("unknown_source");

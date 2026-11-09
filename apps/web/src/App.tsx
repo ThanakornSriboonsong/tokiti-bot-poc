@@ -193,8 +193,19 @@ function QueuePage() {
   );
 }
 
+// Blocks that don't mean the draft is wrong. A draft blocked for anything else, such as a price
+// missing from the data, is never offered as the starting text.
+const SOFT_BLOCKS = ["low_confidence", "no_source"];
+
 function QueueCard({ item, reload }: { item: QueueItem; reload: () => void }) {
-  const [text, setText] = useState(item.result.reply);
+  const { result } = item;
+  const offerDraft =
+    result.action === "handoff" &&
+    result.model_reply !== null &&
+    result.model_reply.trim() !== "" &&
+    result.blocked_by.length > 0 &&
+    result.blocked_by.every((reason) => SOFT_BLOCKS.includes(reason));
+  const [text, setText] = useState(offerDraft ? result.model_reply! : result.reply);
   const [reason, setReason] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -219,6 +230,7 @@ function QueueCard({ item, reload }: { item: QueueItem; reload: () => void }) {
       {item.status === "pending" ? (
         <>
           {item.stock_flag && <p className="error small">สต๊อกเปลี่ยน: {item.stock_flag.map((change) => `${change.sku} ${change.was} → ${change.now}`).join(", ")}</p>}
+          {offerDraft && <p className="small muted">ข้อความด้านล่างมาจากร่างของโมเดล ตรวจให้ถูกต้องก่อนกดบันทึกที่แก้</p>}
           <textarea rows={2} aria-label="ข้อความที่จะส่ง" value={text} onChange={(event) => setText(event.target.value)} />
           <input aria-label="เหตุผล" placeholder="เหตุผล (ถ้าแก้หรือปฏิเสธ)" value={reason} onChange={(event) => setReason(event.target.value)} />
           <div className="row">
@@ -370,6 +382,7 @@ function PromoEditor({ draft, update }: EditorProps) {
 
 function SpecEditor({ draft, update }: EditorProps) {
   const fields = [
+    ["aliases", "ชื่ออื่นที่ลูกค้าเรียก (คั่นด้วย ,)"],
     ["size", "ขนาด"],
     ["weight_limit", "รับน้ำหนัก"],
     ["pet_suitability", "สัตว์เลี้ยงที่เหมาะ"],
@@ -387,7 +400,7 @@ function SpecEditor({ draft, update }: EditorProps) {
             <Field
               key={key}
               label={label}
-              value={spec[key]}
+              value={spec[key] ?? null}
               onChange={(value) => update({ ...draft, specs: draft.specs.map((item, i) => (i === index ? { ...item, [key]: nullable(value) } : item)) })}
             />
           ))}

@@ -13,7 +13,7 @@
     { "id": "trio-set", "title": "Purrfect Trio set", "detail": "TOKITI Nest 1 + TOKITI Lounge 2 ชิ้น + ไม้ตกแมว 1 ราคาเปิดตัว 859 บาท (ปกติ 1,353 บาท) เฉพาะออนไลน์ เลือกสีที่นอนได้ 3 สี", "channel": "online", "starts_at": "2026-10-27", "ends_at": null, "needs_review": true }
   ],
   "specs": [
-    { "id": "nest", "name": "TOKITI Nest", "size": null, "weight_limit": null, "pet_suitability": "ออกแบบสำหรับแมว ยังไม่มีข้อมูลยืนยันการใช้กับสุนัข", "material": null, "care": "ขึ้นรูปชิ้นเดียว ไม่มีรอยต่อ ล้างน้ำได้ แห้งไว น้ำยาทำความสะอาดและการตากแดดต้องให้ทีมยืนยัน", "features": "มี 3 สี Snow White, Latte Beige และ Sakura Pink ทรงหลุมโอบตัว ขอบไล่ระดับ ฐานยกสูง รูด้านข้างช่วยระบายอากาศ ด้านข้างสวม Lounge ได้ ด้านบนติดไม้ตกแมวได้", "needs_review": true },
+    { "id": "nest", "name": "TOKITI Nest", "aliases": "ตะกร้า, ตะกร้าแมว", "size": null, "weight_limit": null, "pet_suitability": "ออกแบบสำหรับแมว ยังไม่มีข้อมูลยืนยันการใช้กับสุนัข", "material": null, "care": "ขึ้นรูปชิ้นเดียว ไม่มีรอยต่อ ล้างน้ำได้ แห้งไว น้ำยาทำความสะอาดและการตากแดดต้องให้ทีมยืนยัน", "features": "มี 3 สี Snow White, Latte Beige และ Sakura Pink ทรงหลุมโอบตัว ขอบไล่ระดับ ฐานยกสูง รูด้านข้างช่วยระบายอากาศ ด้านข้างสวม Lounge ได้ ด้านบนติดไม้ตกแมวได้", "needs_review": true },
     { "id": "lounge", "name": "TOKITI Lounge", "size": null, "weight_limit": null, "pet_suitability": "ที่ลับเล็บสำหรับแมว สวมขอบ TOKITI Nest", "material": null, "care": null, "features": "สวมด้านข้างของ TOKITI Nest", "needs_review": true },
     { "id": "wand", "name": "ไม้ตกแมว TOKITI", "size": null, "weight_limit": null, "pet_suitability": "ของเล่นแมว", "material": null, "care": null, "features": "ติดด้านบนของ TOKITI Nest", "needs_review": true }
   ],
@@ -29,7 +29,7 @@
     "enabled": true,
     "bot_hours": { "start": "23:00", "end": "09:00" },
     "topics": ["price_promo", "delivery", "size_weight", "stock_restock", "order_tracking", "image", "review"],
-    "min_confidence": 0.7
+    "min_confidence": 0.5
   },
   "stock": [
     { "sku": "TK101", "status": "in_stock", "restock_date": null },

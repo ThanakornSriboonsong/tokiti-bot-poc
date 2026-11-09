@@ -37,6 +37,8 @@ export interface Promotion {
 export interface Spec {
   id: string;
   name: string;
+  /** Other names customers use, comma-separated, for example "ตะกร้า, ตะกร้าแมว". */
+  aliases?: string | null;
   size: string | null;
   weight_limit: string | null;
   pet_suitability: string | null;
