@@ -1,6 +1,8 @@
 import { bangkokDate, buildSources, renderKnowledge } from "./knowledge.ts";
+import { LexicalRetriever, buildChunks, buildQuery, tokenize, type Retriever } from "./retrieval.ts";
 import { checkAnswer, customerRiskReasons } from "./safety.ts";
 import {
+  type RetrievalReport,
   TOPICS,
   type Action,
   type BotResult,
@@ -62,7 +64,34 @@ const TOOLS: ToolDefinition[] = [
   },
 ];
 
-function systemPrompt(knowledge: string, today: string): string {
+const SEARCH_TOOL: ToolDefinition = {
+  type: "function",
+  function: {
+    name: "search_knowledge",
+    description: "ค้นข้อมูลที่อนุมัติแล้วเพิ่ม เช่น สินค้า โปรโมชัน สเปก หรือ FAQ ใช้เมื่อข้อมูลที่ให้มายังไม่พอตอบ",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["query"],
+      properties: { query: { type: "string", description: "คำค้นสั้น ๆ เช่น ชื่อสินค้าหรือหัวข้อ" } },
+    },
+  },
+};
+
+export const DEFAULT_TOP_K = 6;
+const MAX_SEARCH_CHARS = 200;
+/** Sources a tool's answer depends on, so retrieval can't leave them out. */
+const TOOL_KNOWLEDGE: Record<string, string[]> = { get_my_orders: ["faq:track"] };
+
+// Eval 2026-11-11 on Haiku 5.5: every source 164-169/176; retrieval 152 with a "not all the data"
+// wording and 149 with this one. The model still hands off on promotion questions even when search
+// returned the right promotions, so retrieval stays off by default until that is solved.
+const RETRIEVAL_RULES = `
+- ข้อมูลที่อนุมัติแล้วด้านล่างคัดมาให้ตรงกับคำถามนี้แล้ว ค่าทุกค่าเป็นข้อมูลจริงที่ร้านอนุมัติ ใช้ตอบได้ทันทีโดยไม่ต้องเช็กเพิ่ม
+- ถ้าข้อมูลที่ต้องใช้ไม่อยู่ด้านล่าง ให้เรียก search_knowledge ก่อน handoff
+- อ้าง source_ids ได้เฉพาะ id ที่เห็นในข้อมูลด้านล่างหรือในผลจากเครื่องมือ`;
+
+function systemPrompt(knowledge: string, today: string, retrieval = false): string {
   return `คุณช่วยร่างคำตอบแชท LINE ของร้าน TOKITI ทีมงานจะตรวจก่อนส่งเสมอ
 
 น้ำเสียง: เหมือนแอดมินวัยรุ่นที่รักแมว พิมพ์แบบชิล ๆ เป็นกันเอง แต่ยังสุภาพเสมอ
@@ -97,7 +126,7 @@ function systemPrompt(knowledge: string, today: string): string {
 - ถามเรื่องการจัดส่ง ให้ตอบข้อมูลที่มีจาก faq:shipping เช่น ขนส่งและวิธีคิดค่าส่ง พร้อมบอกว่ายังยืนยันวันถึงไม่ได้ ไม่ต้อง handoff ยกเว้นลูกค้าต้องการให้ยืนยันวันถึง
 - ทุกตัวเลขในคำตอบต้องมีอยู่ในข้อมูลที่อ้างใน source_ids ถ้าบอกจำนวนสี ให้อ้าง spec:nest
 - ถ้าคำถามกำกวม ใช้ action=ask_followup ถามกลับ 1 คำถาม
-- confidence คือความมั่นใจ 0 ถึง 1
+- confidence คือความมั่นใจ 0 ถึง 1${retrieval ? RETRIEVAL_RULES : ""}
 
 ตอบเป็น JSON ตาม schema เท่านั้น
 
@@ -161,6 +190,8 @@ export interface PipelineDeps {
   orders: OrderProvider;
   now?: Date;
   history?: HistoryTurn[];
+  /** Used when settings.retrieval is on. Defaults to word search, which needs no key. */
+  retriever?: Retriever;
 }
 
 export async function answerMessage(
@@ -170,7 +201,25 @@ export async function answerMessage(
 ): Promise<BotResult> {
   const started = Date.now();
   const now = deps.now ?? new Date();
-  const sources = buildSources(deps.snapshot, now);
+  const catalog = buildSources(deps.snapshot, now);
+  const retrievalSettings = deps.snapshot.settings.retrieval;
+  const retrievalOn = retrievalSettings?.enabled === true;
+  const topK = Math.max(1, Math.round(retrievalSettings?.top_k ?? DEFAULT_TOP_K));
+  const retriever = deps.retriever ?? new LexicalRetriever();
+  const chunks = retrievalOn ? buildChunks(deps.snapshot, now) : [];
+  let report: RetrievalReport | undefined;
+  // In retrieval mode this holds only what the model was shown, so citing anything else is blocked.
+  const sources = retrievalOn ? new Map<string, string>() : catalog;
+  const reveal = (ids: string[]) => {
+    const added: { id: string; text: string }[] = [];
+    for (const id of ids) {
+      const text = catalog.get(id);
+      if (text === undefined || sources.has(id)) continue;
+      sources.set(id, text);
+      added.push({ id, text });
+    }
+    return added;
+  };
   const history = selectHistory(deps.history ?? [], now);
   const stockChecks: StockItem[] = [];
   const toolCalls: string[] = [];
@@ -203,7 +252,24 @@ export async function answerMessage(
       // Arguments are ignored on purpose: identity comes from the app.
       const orders = await deps.orders.listForCustomer(customerId);
       orders.forEach((order, index) => sources.set(`order:${index}`, JSON.stringify(order)));
-      return JSON.stringify(orders.map((order, index) => ({ id: `order:${index}`, ...order })));
+      const rows = orders.map((order, index) => ({ id: `order:${index}`, ...order }));
+      if (!retrievalOn) return JSON.stringify(rows);
+      return JSON.stringify({ orders: rows, knowledge: reveal(TOOL_KNOWLEDGE.get_my_orders ?? []) });
+    }
+    if (call.function.name === "search_knowledge" && retrievalOn && report) {
+      let query = "";
+      try {
+        const args = JSON.parse(call.function.arguments || "{}") as { query?: unknown };
+        if (typeof args.query === "string") query = args.query.slice(0, MAX_SEARCH_CHARS);
+      } catch {
+        query = "";
+      }
+      report.searches += 1;
+      if (!query.trim()) return JSON.stringify({ error: "empty_query" });
+      const found = await retriever.search(chunks, query, topK);
+      if (found.error) report.error = found.error;
+      const added = reveal(found.hits.map((hit) => hit.id));
+      return JSON.stringify(added.length > 0 ? added : { found: "nothing_new" });
     }
     return JSON.stringify({ error: "unknown_tool" });
   };
@@ -224,20 +290,52 @@ export async function answerMessage(
       model: modelName,
       latency_ms: Date.now() - started,
       history_count: history.length,
+      ...(report ? { retrieval: report } : {}),
     };
   };
 
   const riskReasons = customerRiskReasons(message.text);
   if (riskReasons.length > 0) return { ...finish(null, riskReasons), topic: "risky" };
 
+  if (retrievalOn) {
+    const query = buildQuery(message.text, history);
+    // An image with no caption, or only emoji, gives nothing to search, so send everything.
+    if (tokenize(query).length === 0) {
+      reveal([...catalog.keys()]);
+      report = { mode: retriever.mode, query, hits: [], searches: 0, sent_all: true };
+    } else {
+      // A failed search must not leave the model with nothing, so it falls back to every source.
+      const found = await retriever.search(chunks, query, topK).catch((cause: unknown) => ({
+        hits: [],
+        error: `retrieval_failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+        failed: true,
+      }));
+      // Greetings and thanks match nothing. Sending nothing left the model no source to cite,
+      // so those polite replies were blocked; sending everything keeps them as before.
+      const sendAll = "failed" in found || found.hits.length === 0;
+      reveal(sendAll ? [...catalog.keys()] : found.hits.map((hit) => hit.id));
+      report = {
+        mode: retriever.mode,
+        query,
+        hits: found.hits.map((hit) => ({ ...hit, score: Number(hit.score.toFixed(4)) })),
+        searches: 0,
+        sent_all: sendAll,
+        ...(found.error ? { error: found.error } : {}),
+      };
+    }
+  }
+
+  // With every source sent, the prompt and tools are the same as with retrieval off.
+  const narrowed = retrievalOn && report?.sent_all === false;
+  const tools = narrowed ? [...TOOLS, SEARCH_TOOL] : TOOLS;
   const messages: ChatMessage[] = [
-    { role: "system", content: systemPrompt(renderKnowledge(sources), bangkokDate(now)) },
+    { role: "system", content: systemPrompt(renderKnowledge(sources), bangkokDate(now), narrowed) },
     { role: "user", content: userContent(message, history) },
   ];
 
   try {
     for (let round = 0; round < MAX_MODEL_ROUNDS; round += 1) {
-      const response = await deps.model.complete({ messages, tools: TOOLS, schema: ANSWER_SCHEMA });
+      const response = await deps.model.complete({ messages, tools, schema: ANSWER_SCHEMA });
       modelName = response.model;
       usage.prompt_tokens += response.usage.prompt_tokens;
       usage.completion_tokens += response.usage.completion_tokens;

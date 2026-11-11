@@ -4,3 +4,4 @@ export * from "./stock.ts";
 export * from "./model.ts";
 export * from "./safety.ts";
 export * from "./pipeline.ts";
+export * from "./retrieval.ts";

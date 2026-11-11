@@ -52,6 +52,8 @@ export interface Faq {
   id: string;
   topic: string;
   content: string;
+  /** Words customers use for this topic. Search only: never shown to the model or quoted. */
+  keywords?: string | null;
   needs_review?: boolean;
 }
 
@@ -60,6 +62,20 @@ export interface Settings {
   bot_hours: { start: string; end: string };
   topics: Topic[];
   min_confidence: number;
+  /** Off or missing: every approved source goes in the prompt. On: only the top matches. */
+  retrieval?: { enabled: boolean; top_k: number };
+}
+
+export interface RetrievalReport {
+  mode: "lexical" | "hybrid";
+  query: string;
+  /** Ids the search returned, best first, including linked ones. */
+  hits: { id: string; score: number; via: string[] }[];
+  /** Times the model asked for more with search_knowledge. */
+  searches: number;
+  /** True when search had nothing to use or found nothing, or failed, so every source was sent. */
+  sent_all: boolean;
+  error?: string;
 }
 
 export interface Snapshot {
@@ -173,5 +189,6 @@ export interface BotResult {
   model: string | null;
   latency_ms: number;
   history_count: number;
+  retrieval?: RetrievalReport;
   error?: string;
 }

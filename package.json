@@ -11,6 +11,7 @@
     "test": "node --disable-warning=ExperimentalWarning --import tsx --test \"packages/core/test/*.test.ts\" \"apps/api/test/*.test.ts\" \"evals/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "eval": "node --disable-warning=ExperimentalWarning --import tsx evals/run.ts",
+    "eval:retrieval": "node --disable-warning=ExperimentalWarning --import tsx evals/retrieval.ts",
     "shortlist": "node --import tsx evals/shortlist.ts"
   },
   "devDependencies": {
