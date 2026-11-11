@@ -66,7 +66,8 @@ export function buildSources(snapshot: Snapshot, now: Date): Map<string, string>
     if (isPromotionActive(promotion, now)) sources.set(`promo:${promotion.id}`, JSON.stringify(promotion));
   }
   for (const spec of snapshot.specs) sources.set(`spec:${spec.id}`, JSON.stringify(spec));
-  for (const faq of snapshot.faqs) sources.set(`faq:${faq.id}`, JSON.stringify(faq));
+  // Search keywords are left out, so the model and the number checks see only the answer itself.
+  for (const { keywords: _searchOnly, ...faq } of snapshot.faqs) sources.set(`faq:${faq.id}`, JSON.stringify(faq));
   return sources;
 }
 

@@ -1,9 +1,15 @@
 // Usage: npm run eval -- --models vendor/model-a,vendor/model-b [--limit 20]
+//        [--retrieval [--top-k 6] [--embedding-model vendor/embedding-model]]
 // This spends OpenRouter credit. Check the case count before a full run.
+// --retrieval sends only the matching sources; compare its result file with the one without it.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
+  HybridRetriever,
+  LexicalRetriever,
+  OpenRouterEmbedder,
   OpenRouterProvider,
+  type Retriever,
   SampleStockProvider,
   answerMessage,
   extractPrices,
@@ -50,7 +56,15 @@ export function score(item: EvalCase, result: BotResult, allowedPrices: Set<stri
   return failures;
 }
 
-async function runModel(model: string, cases: EvalCase[], apiKey: string) {
+interface RetrievalOption {
+  retriever: Retriever;
+  topK: number;
+}
+
+async function runModel(model: string, cases: EvalCase[], apiKey: string, retrieval?: RetrievalOption) {
+  const snapshot: Snapshot = retrieval
+    ? { ...seed, settings: { ...seed.settings, retrieval: { enabled: true, top_k: retrieval.topK } } }
+    : { ...seed, settings: { ...seed.settings, retrieval: { enabled: false, top_k: 6 } } };
   const provider = new OpenRouterProvider({ apiKey, model });
   const stock = new SampleStockProvider(async () => seed.stock);
   const orders = {
@@ -72,7 +86,15 @@ async function runModel(model: string, cases: EvalCase[], apiKey: string) {
           text,
           at: new Date(NOW.getTime() - 60_000).toISOString(),
         }));
-        const result = await answerMessage({ text: item.text }, item.customer ?? "demo-a", { snapshot: seed, model: provider, stock, orders, now: NOW, history });
+        const result = await answerMessage({ text: item.text }, item.customer ?? "demo-a", {
+          snapshot,
+          model: provider,
+          stock,
+          orders,
+          now: NOW,
+          history,
+          ...(retrieval ? { retriever: retrieval.retriever } : {}),
+        });
         rows.push({ item, result, failures: score(item, result, allowedPrices) });
       }
     }),
@@ -85,6 +107,8 @@ async function runModel(model: string, cases: EvalCase[], apiKey: string) {
   return {
     summary: {
       model,
+      retrieval: retrieval ? `${retrieval.retriever.mode} top ${retrieval.topK}` : "all sources",
+      model_searches: rows.reduce((sum, row) => sum + (row.result.retrieval?.searches ?? 0), 0),
       cases: rows.length,
       passed: rows.filter((row) => row.failures.length === 0).length,
       wrong_price: count("wrong_price"),
@@ -127,14 +151,24 @@ async function main() {
   // Take evenly spaced cases, so a small run covers every topic rather than only prices.
   const step = Math.max(1, CASES.length / limit);
   const cases = Array.from({ length: Math.min(limit, CASES.length) }, (_, index) => CASES[Math.floor(index * step)]!);
+  const embeddingModel = argument("embedding-model");
+  const retrieval: RetrievalOption | undefined = process.argv.includes("--retrieval")
+    ? {
+        retriever: embeddingModel
+          ? new HybridRetriever(new OpenRouterEmbedder({ apiKey, model: embeddingModel }))
+          : new LexicalRetriever(),
+        topK: Number(argument("top-k") ?? 6),
+      }
+    : undefined;
   const outputDir = fileURLToPath(new URL("./results/", import.meta.url));
   mkdirSync(outputDir, { recursive: true });
   const summaries = [];
   for (const model of models) {
-    console.log(`Running ${cases.length} cases on ${model}`);
-    const report = await runModel(model, cases, apiKey);
+    console.log(`Running ${cases.length} cases on ${model}${retrieval ? ` with ${retrieval.retriever.mode} retrieval` : ""}`);
+    const report = await runModel(model, cases, apiKey, retrieval);
     summaries.push(report.summary);
-    writeFileSync(`${outputDir}${model.replaceAll("/", "__")}.json`, JSON.stringify(report, null, 2));
+    const suffix = retrieval ? `__rag-${retrieval.retriever.mode}` : "";
+    writeFileSync(`${outputDir}${model.replaceAll("/", "__")}${suffix}.json`, JSON.stringify(report, null, 2));
   }
   console.table(summaries);
 }

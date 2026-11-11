@@ -1,6 +1,14 @@
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { OpenRouterProvider, TokitiStockProvider, type ModelProvider, type StockProvider } from "@tokiti/core";
+import {
+  HybridRetriever,
+  OpenRouterEmbedder,
+  OpenRouterProvider,
+  TokitiStockProvider,
+  type ModelProvider,
+  type Retriever,
+  type StockProvider,
+} from "@tokiti/core";
 import { existsSync } from "node:fs";
 import { relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,6 +35,13 @@ const model: ModelProvider | null =
       })
     : null;
 
+// Word search needs no key. With an embedding model it also ranks by meaning (costs a little credit).
+const { OPENROUTER_EMBEDDING_MODEL } = process.env;
+const retriever: Retriever | undefined =
+  OPENROUTER_API_KEY && OPENROUTER_EMBEDDING_MODEL
+    ? new HybridRetriever(new OpenRouterEmbedder({ apiKey: OPENROUTER_API_KEY, model: OPENROUTER_EMBEDDING_MODEL }))
+    : undefined;
+
 let stock: StockProvider | undefined;
 if (process.env.STOCK_PROVIDER === "tokiti") {
   const { TOKITI_STOCK_URL, TOKITI_STOCK_KEY } = process.env;
@@ -46,6 +61,7 @@ const app = createApp({
   ...(stock ? { stock } : {}),
   ...(password ? { password } : {}),
   ...(dailyChatLimit === undefined ? {} : { dailyChatLimit }),
+  ...(retriever ? { retriever } : {}),
 });
 
 // A hosted copy serves the built control web from this one server.

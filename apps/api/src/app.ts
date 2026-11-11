@@ -13,6 +13,7 @@ import {
   type ModelProvider,
   type Order,
   type OrderProvider,
+  type Retriever,
   type Snapshot,
   type StockItem,
   type StockProvider,
@@ -32,6 +33,8 @@ export interface AppDeps {
   password?: string;
   /** Caps bot calls per Bangkok day, so a shared link can't drain the OpenRouter credit. */
   dailyChatLimit?: number;
+  /** Used when the published settings turn retrieval on. Defaults to word search. */
+  retriever?: Retriever;
 }
 
 export function sampleStock(db: DatabaseSync): StockProvider {
@@ -109,7 +112,7 @@ const toReply = (row: ReplyRow) => ({
   stock_flag: row.stock_flag ? JSON.parse(row.stock_flag) : null,
 });
 
-export function createApp({ db, model, stock, now = () => new Date(), password, dailyChatLimit }: AppDeps) {
+export function createApp({ db, model, stock, now = () => new Date(), password, dailyChatLimit, retriever }: AppDeps) {
   const app = new Hono();
   const stockProvider = loggedStock(db, stock ?? sampleStock(db));
   const orders = orderProvider(db);
@@ -121,7 +124,11 @@ export function createApp({ db, model, stock, now = () => new Date(), password, 
   if (password) app.use("*", basicAuth({ username: "tokiti", password }));
 
   app.get("/api/status", (c) =>
-    c.json({ model_configured: model !== null, published_version: getPublished(db).id }),
+    c.json({
+      model_configured: model !== null,
+      published_version: getPublished(db).id,
+      retrieval_mode: retriever?.mode ?? "lexical",
+    }),
   );
 
   app.get("/api/draft", (c) => c.json(getDraft(db)));
@@ -195,6 +202,7 @@ export function createApp({ db, model, stock, now = () => new Date(), password, 
       orders,
       now: current,
       history: loadHistory(db, customerId),
+      ...(retriever ? { retriever } : {}),
     });
 
     if (preview) return c.json({ preview: true, result });

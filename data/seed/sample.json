@@ -18,18 +18,19 @@
     { "id": "wand", "name": "ไม้ตกแมว TOKITI", "size": null, "weight_limit": null, "pet_suitability": "ของเล่นแมว", "material": null, "care": null, "features": "ติดด้านบนของ TOKITI Nest", "needs_review": true }
   ],
   "faqs": [
-    { "id": "shipping", "topic": "ค่าส่งและเวลาจัดส่ง", "content": "ค่าส่งคิดตามสินค้าและรหัสไปรษณีย์ปลายทาง ดูยอดล่าสุดในตะกร้าก่อนชำระ ขนส่งที่ใช้คือ SPX Express และ DHL eCommerce งานออนไลน์ส่งจากโกดังเชียงใหม่ ยังไม่มีระยะเวลาจัดส่งที่ร้านยืนยัน ห้ามสัญญาวันถึง", "needs_review": true },
-    { "id": "ordering", "topic": "วิธีสั่งซื้อ", "content": "เลือกสินค้าหรือเซ็ตและสี ใส่ตะกร้า กรอกที่อยู่ ตรวจส่วนลดและค่าส่ง ยืนยันออเดอร์ แล้วแนบหลักฐานการชำระเงินที่ https://backoffice-console.vercel.app/shop/tokiti", "needs_review": true },
-    { "id": "track", "topic": "ติดตามออเดอร์", "content": "ลูกค้าดูออเดอร์และเลขพัสดุของตัวเองได้ที่ https://backoffice-console.vercel.app/shop/tokiti?view=orders", "needs_review": true },
-    { "id": "payment", "topic": "การชำระเงิน", "content": "ข้อความหรือรูปสลิปยังไม่ใช่การยืนยันว่าได้รับเงิน ทีมงานต้องตรวจก่อนเสมอ", "needs_review": true },
-    { "id": "hygiene", "topic": "ขอบเขตเรื่องสุขอนามัย", "content": "คุณสมบัติของที่นอนช่วยให้ดูแลความสะอาดง่าย แต่ไม่ใช่ผลทดสอบว่าป้องกันหรือรักษาเชื้อรา หากน้องมีอาการที่สงสัยควรพบสัตวแพทย์", "needs_review": true },
-    { "id": "reviews", "topic": "รีวิวสินค้า", "content": "ดูรีวิวและบรรยากาศลูกค้าได้ที่ช่องทาง @tokiti.official บน Instagram, Facebook และ TikTok", "needs_review": true }
+    { "id": "shipping", "topic": "ค่าส่งและเวลาจัดส่ง", "content": "ค่าส่งคิดตามสินค้าและรหัสไปรษณีย์ปลายทาง ดูยอดล่าสุดในตะกร้าก่อนชำระ ขนส่งที่ใช้คือ SPX Express และ DHL eCommerce งานออนไลน์ส่งจากโกดังเชียงใหม่ ยังไม่มีระยะเวลาจัดส่งที่ร้านยืนยัน ห้ามสัญญาวันถึง", "keywords": "ส่งของ ขนส่ง ค่าส่ง กี่วัน ได้ของ ส่งที่ไหน ต่างจังหวัด", "needs_review": true },
+    { "id": "ordering", "topic": "วิธีสั่งซื้อ", "content": "เลือกสินค้าหรือเซ็ตและสี ใส่ตะกร้า กรอกที่อยู่ ตรวจส่วนลดและค่าส่ง ยืนยันออเดอร์ แล้วแนบหลักฐานการชำระเงินที่ https://backoffice-console.vercel.app/shop/tokiti", "keywords": "สั่งซื้อ สั่งยังไง ซื้อที่ไหน ซื้อยังไง เว็บ", "needs_review": true },
+    { "id": "track", "topic": "ติดตามออเดอร์", "content": "ลูกค้าดูออเดอร์และเลขพัสดุของตัวเองได้ที่ https://backoffice-console.vercel.app/shop/tokiti?view=orders", "keywords": "ติดตาม เลขพัสดุ ออเดอร์ ถึงไหน ส่งหรือยัง สถานะ", "needs_review": true },
+    { "id": "payment", "topic": "การชำระเงิน", "content": "ข้อความหรือรูปสลิปยังไม่ใช่การยืนยันว่าได้รับเงิน ทีมงานต้องตรวจก่อนเสมอ", "keywords": "จ่ายเงิน โอนเงิน ชำระเงิน สลิป", "needs_review": true },
+    { "id": "hygiene", "topic": "ขอบเขตเรื่องสุขอนามัย", "content": "คุณสมบัติของที่นอนช่วยให้ดูแลความสะอาดง่าย แต่ไม่ใช่ผลทดสอบว่าป้องกันหรือรักษาเชื้อรา หากน้องมีอาการที่สงสัยควรพบสัตวแพทย์", "keywords": "เชื้อรา สะอาด สุขอนามัย ป่วย", "needs_review": true },
+    { "id": "reviews", "topic": "รีวิวสินค้า", "content": "ดูรีวิวและบรรยากาศลูกค้าได้ที่ช่องทาง @tokiti.official บน Instagram, Facebook และ TikTok", "keywords": "รีวิว ของดีไหม ชอบ ได้ของแล้ว น่ารัก ขอบคุณ รูปลูกค้า", "needs_review": true }
   ],
   "settings": {
     "enabled": true,
     "bot_hours": { "start": "23:00", "end": "09:00" },
     "topics": ["price_promo", "delivery", "size_weight", "stock_restock", "order_tracking", "image", "review"],
-    "min_confidence": 0.5
+    "min_confidence": 0.5,
+    "retrieval": { "enabled": false, "top_k": 6 }
   },
   "stock": [
     { "sku": "TK101", "status": "in_stock", "restock_date": null },

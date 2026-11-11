@@ -85,6 +85,18 @@ function ResultCard({ result }: { result: BotResult }) {
       {result.error && <p className="small error">รายละเอียด: {result.error}</p>}
       {result.model_reply && result.model_reply !== result.reply && <p className="small muted">ร่างจากโมเดล: {result.model_reply}</p>}
       {result.source_ids.length > 0 && <p className="small muted">แหล่งข้อมูล: {result.source_ids.join(", ")}</p>}
+      {result.retrieval && (
+        <p className="small muted">
+          ค้นข้อมูล ({result.retrieval.mode === "hybrid" ? "คำ + ความหมาย" : "คำ"}):{" "}
+          {result.retrieval.sent_all
+            ? "ไม่มีคำให้ค้น จึงส่งข้อมูลทั้งหมด"
+            : result.retrieval.hits.length > 0
+              ? result.retrieval.hits.map((hit) => (hit.via.includes("link") ? `${hit.id} (ที่เกี่ยวข้อง)` : hit.id)).join(", ")
+              : "ไม่พบข้อมูลที่ตรง"}
+          {result.retrieval.searches > 0 ? ` · โมเดลค้นเพิ่ม ${result.retrieval.searches} ครั้ง` : ""}
+          {result.retrieval.error ? ` · ค้นแบบความหมายไม่สำเร็จ: ${result.retrieval.error}` : ""}
+        </p>
+      )}
       {result.stock_checks.length > 0 && (
         <p className="small muted">
           สต๊อกล่าสุด: {result.stock_checks.map((item) => `${item.sku} ${STOCK_LABELS[item.status]}`).join(", ")}
@@ -423,6 +435,11 @@ function FaqEditor({ draft, update }: EditorProps) {
             เนื้อหา
             <textarea rows={3} value={faq.content} onChange={(event) => setFaq(index, { content: event.target.value })} />
           </label>
+          <Field
+            label="คำค้นเพิ่ม (คำที่ลูกค้ามักพิมพ์ ใช้ค้นหาเท่านั้น บอทไม่นำไปตอบ)"
+            value={faq.keywords ?? ""}
+            onChange={(keywords) => setFaq(index, { keywords })}
+          />
           <button onClick={() => update({ ...draft, faqs: draft.faqs.filter((_, i) => i !== index) })}>ลบ</button>
         </div>
       ))}
@@ -443,6 +460,23 @@ function SettingsEditor({ draft, update }: EditorProps) {
         <Field label="หยุดตอบ" type="time" value={settings.bot_hours.end} onChange={(end) => setSettings({ bot_hours: { ...settings.bot_hours, end } })} />
         <Field label="ความมั่นใจขั้นต่ำ" type="number" value={settings.min_confidence} onChange={(value) => setSettings({ min_confidence: Number(value) })} />
       </div>
+      <h3>การค้นข้อมูล (RAG)</h3>
+      <label className="block">
+        <input
+          type="checkbox"
+          checked={settings.retrieval?.enabled ?? false}
+          onChange={(event) => setSettings({ retrieval: { top_k: settings.retrieval?.top_k ?? 6, enabled: event.target.checked } })}
+        />{" "}
+        ส่งให้โมเดลเฉพาะข้อมูลที่ตรงกับคำถาม (ปิด = ส่งข้อมูลทั้งหมดทุกครั้ง)
+      </label>
+      {settings.retrieval?.enabled && (
+        <Field
+          label="จำนวนข้อมูลที่ค้นได้สูงสุด"
+          type="number"
+          value={settings.retrieval.top_k}
+          onChange={(value) => setSettings({ retrieval: { enabled: true, top_k: Math.max(1, Number(value) || 1) } })}
+        />
+      )}
       <h3>หัวข้อที่เปิดให้ตอบ</h3>
       {(["price_promo", "delivery", "size_weight", "stock_restock", "order_tracking", "image", "review"] as const).map((topic) => (
         <label className="block" key={topic}>
