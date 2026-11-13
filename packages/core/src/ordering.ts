@@ -104,7 +104,8 @@ export function renderPayment(quote: OrderQuote, bank: BankDetails): string {
   ].join("\n");
 }
 
-const NEGATIVE = /ไม่|ยัง|เดี๋ยว|รอก่อน|ขอคิด|แก้|เปลี่ยน|ยกเลิก|\bno\b|\bnot\b|wait|cancel/i;
+// A yes with a condition ("แต่", a discount, "ถ้า") is not a clear yes.
+const NEGATIVE = /ไม่|ยัง|เดี๋ยว|รอก่อน|ขอคิด|แก้|เปลี่ยน|ยกเลิก|แต่|ลด|ถ้า|but|\bno\b|\bnot\b|wait|cancel/i;
 const AFFIRMATIVE = /ยืนยัน|ตกลง|โอเค|โอเช|ok(ay)?\b|ได้(เลย)?(ค่ะ|คะ|ครับ|จ้า|ค่า)?$|เอา(เลย|ค่ะ|ครับ)|สั่งเลย|ถูกต้อง|ใช่|confirm|yes/i;
 
 /** A clear yes, with nothing that sounds like "not yet" or "change it". */

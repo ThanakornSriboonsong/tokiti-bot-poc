@@ -76,7 +76,7 @@ const summaryDraft = (over: Partial<OrderDraft> = {}): OrderDraft => {
 
 test("a clear yes is short and has no hesitation", () => {
   for (const yes of ["ยืนยันค่ะ", "ตกลง", "โอเคค่ะ", "ok", "ได้ค่ะ", "เอาเลย", "สั่งเลยค่ะ", "ถูกต้องค่ะ"]) assert.ok(isClearYes(yes), yes);
-  for (const no of ["ยังไม่เอา", "เดี๋ยวก่อนนะ", "ขอคิดก่อน", "ไม่ยืนยัน", "ขอเปลี่ยนสี", "ok แต่ขอแก้ที่อยู่", "ยกเลิก", "", "ยืนยันค่ะ ".repeat(10)]) assert.ok(!isClearYes(no), no);
+  for (const no of ["ยังไม่เอา", "เดี๋ยวก่อนนะ", "ขอคิดก่อน", "ไม่ยืนยัน", "ขอเปลี่ยนสี", "ok แต่ขอแก้ที่อยู่", "ยืนยันค่ะ ลดเหลือ 100 บาทด้วยนะ", "ตกลงถ้าส่งฟรี", "ยกเลิก", "", "ยืนยันค่ะ ".repeat(10)]) assert.ok(!isClearYes(no), no);
 });
 
 test("a recipient needs a name, Thai phone, address and 5-digit postcode", () => {

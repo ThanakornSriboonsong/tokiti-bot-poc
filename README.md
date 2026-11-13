@@ -64,6 +64,19 @@ The same setup varies by about 5 cases between runs, so the drop is real. Search
 
 In PowerShell, `npm run eval -- ...` loses its flags because PowerShell strips `--`. Call `node --disable-warning=ExperimentalWarning --import tsx evals/run.ts --models ... --retrieval` directly, and check that the summary's `retrieval` column says what you meant.
 
+## Ordering
+
+On in the sample settings (`settings.ordering.enabled`). The bot can take an order in chat:
+
+1. It asks for what's missing: product and colour, quantity, recipient name, phone, address and postcode.
+2. With everything known, it calls `prepare_order_summary`. Code renders the summary from the quote, so the model never writes a total.
+3. After the summary, a short clear yes ("ยืนยัน", "ตกลง", "โอเค") makes it call `confirm_order`. Code checks that the summary is the shop's latest message, that the yes has no condition such as "แต่" or a discount, and that a fresh quote still matches. Then it sends the amount and the bank details from the ordering settings. A changed quote sends a new summary instead.
+4. A picture while the order waits for payment is recorded as the slip, and the bot says staff will check it. It never confirms payment.
+
+The pipeline only returns `result.order`. The API stores it when staff approve the exact reply, so an edited or rejected reply changes nothing. The sample shipping fee and bank account are EXAMPLE placeholders.
+
+`npm run eval -- --models a/b --ordering` runs the 31 ordering cases (in PowerShell, call node directly as below). **Measured on 14 Nov 2026 (Haiku 5.5):** 31/31 ordering cases, with no confirmation without a clear yes, no leaked account and no wrong amount. With ordering on, the 176 general cases passed 160, against 164 and 169 before, so it may cost a few answers; re-measure before relying on it.
+
 ## Hosted test copy
 
 `render.yaml` deploys one Render web service that serves both the API and the control web. It needs two secrets, set only in Render: `OPENROUTER_API_KEY` and `APP_PASSWORD`. The login username is `tokiti`.

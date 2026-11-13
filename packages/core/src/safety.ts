@@ -29,7 +29,7 @@ const CUSTOMER_RULES: { pattern: RegExp; reason: string }[] = [
   { pattern: /(โอน|จ่าย|ชำระ)(เงิน)?(ไป|มา|ให้)?(แล้ว|เรียบร้อย)/, reason: "payment_claim" },
   {
     pattern:
-      /ignore\s+(all\s+|any\s+|your\s+|the\s+)*(previous|prior|above|instructions?|rules?)|disregard\s+(all\s+|any\s+|your\s+|the\s+)*(previous|prior|above|instructions?|rules?)|system\s*prompt|your\s+(prompt|instructions)|^\s*system\s*:|<\/?customer>|get_my_orders|get_stock|ลืมกฎ|ลืมคำสั่ง|ไม่ต้องสนกฎ|ข้ามกฎ|เปลี่ยนกฎ|(ข้อความ|คำสั่ง|พรอมต์|พร้อมต์)(ของ)?ระบบ|คำสั่งที่ตั้งไว้|ไม่มีข้อจำกัด|ทำตัวเป็น|แกล้งเป็น|สมมติว่าคุณเป็น/i,
+      /ignore\s+(all\s+|any\s+|your\s+|the\s+)*(previous|prior|above|instructions?|rules?)|disregard\s+(all\s+|any\s+|your\s+|the\s+)*(previous|prior|above|instructions?|rules?)|system\s*prompt|your\s+(prompt|instructions)|^\s*system\s*:|^\s*ระบบ\s*:|<\/?customer>|get_my_orders|get_stock|ลืมกฎ|ลืมคำสั่ง|ไม่ต้องสนกฎ|ข้ามกฎ|เปลี่ยนกฎ|(ข้อความ|คำสั่ง|พรอมต์|พร้อมต์)(ของ)?ระบบ|คำสั่งที่ตั้งไว้|ไม่มีข้อจำกัด|ทำตัวเป็น|แกล้งเป็น|สมมติว่าคุณเป็น/i,
     reason: "prompt_injection",
   },
   {

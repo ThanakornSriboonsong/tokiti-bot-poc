@@ -15,10 +15,15 @@ import {
   extractPrices,
   type BotResult,
   type Order,
+  type OrderingProvider,
+  renderSummary,
   type Snapshot,
   type StockStatus,
 } from "@tokiti/core";
 import { CASES, type EvalCase } from "./cases.ts";
+import { EVAL_LINES, EVAL_RECIPIENT, ORDER_CASES, type OrderEvalCase } from "./ordering_cases.ts";
+import { openDb, seedDb } from "../apps/api/src/db.ts";
+import { getOrderingConfig, sampleOrdering } from "../apps/api/src/ordering.ts";
 
 try {
   process.loadEnvFile(fileURLToPath(new URL("../.env", import.meta.url)));
@@ -44,9 +49,20 @@ function averageCost(rows: { result: BotResult }[]): number | null {
   return costs.length ? (costs.reduce((sum, value) => sum + value, 0) / costs.length) * 1000 : null;
 }
 
-export function score(item: EvalCase, result: BotResult, allowedPrices: Set<string>): string[] {
+export function score(item: EvalCase | OrderEvalCase, result: BotResult, allowedPrices: Set<string>, bankAccount?: string): string[] {
   const failures: string[] = [];
   const reply = result.reply;
+  const step = result.order?.kind ?? "none";
+  if ("order" in item) {
+    if (step === "confirm" && item.order !== "confirm") failures.push("unwanted_confirm");
+    else if (item.order === "summary" || item.order === "confirm" ? step !== item.order : item.order === "none" && step !== "none") failures.push("order_step_mismatch");
+  }
+  if (bankAccount && reply.includes(bankAccount) && step !== "confirm") failures.push("bank_leak");
+  // Totals in a rendered summary or payment message come from the quote, so they count as allowed.
+  const quote = result.order && "quote" in result.order ? result.order.quote : null;
+  if (quote) {
+    allowedPrices = new Set([...allowedPrices, ...[quote.subtotal, quote.shipping_fee, quote.total, ...quote.lines.flatMap((line) => [line.unit_price, line.line_total])].map(String)]);
+  }
   if (item.expect === "handoff" && result.action !== "handoff") failures.push("should_hand_off");
   if (item.expect === "answer" && result.action !== "answer") failures.push("should_answer");
   if (item.expect === "answer_or_followup" && result.action === "handoff") failures.push("should_answer");
@@ -61,7 +77,32 @@ interface RetrievalOption {
   topK: number;
 }
 
-async function runModel(model: string, cases: EvalCase[], apiKey: string, retrieval?: RetrievalOption) {
+/** Sample ordering from the seed, with the case's existing order (if any) on file. */
+function orderingFor(item: EvalCase | OrderEvalCase, snapshot: Snapshot): OrderingProvider {
+  const db = openDb(":memory:");
+  seedDb(db);
+  const base = sampleOrdering(db, () => snapshot);
+  const draft = "draft" in item ? item.draft : undefined;
+  return {
+    quote: base.quote,
+    bank: base.bank,
+    current: async () => {
+      if (!draft) return null;
+      const quote = await base.quote(EVAL_LINES, EVAL_RECIPIENT.postcode);
+      return {
+        id: "eval-draft",
+        state: draft === "awaiting_slip" ? "awaiting_slip" : "summary_sent",
+        lines: EVAL_LINES,
+        recipient: EVAL_RECIPIENT,
+        quote,
+        summary_text: renderSummary(quote, EVAL_RECIPIENT),
+        summary_is_latest: draft !== "summary_stale",
+      };
+    },
+  };
+}
+
+async function runModel(model: string, cases: (EvalCase | OrderEvalCase)[], apiKey: string, retrieval?: RetrievalOption) {
   const snapshot: Snapshot = retrieval
     ? { ...seed, settings: { ...seed.settings, retrieval: { enabled: true, top_k: retrieval.topK } } }
     : { ...seed, settings: { ...seed.settings, retrieval: { enabled: false, top_k: 6 } } };
@@ -76,7 +117,11 @@ async function runModel(model: string, cases: EvalCase[], apiKey: string, retrie
     ),
   );
 
-  const rows: { item: EvalCase; result: BotResult; failures: string[] }[] = [];
+  const configDb = openDb(":memory:");
+  seedDb(configDb);
+  const bankAccount = getOrderingConfig(configDb).bank?.account;
+  const orderingOn = snapshot.settings.ordering?.enabled === true;
+  const rows: { item: EvalCase | OrderEvalCase; result: BotResult; failures: string[] }[] = [];
   const queue = [...cases];
   await Promise.all(
     Array.from({ length: CONCURRENCY }, async () => {
@@ -94,8 +139,9 @@ async function runModel(model: string, cases: EvalCase[], apiKey: string, retrie
           now: NOW,
           history,
           ...(retrieval ? { retriever: retrieval.retriever } : {}),
+          ...(orderingOn ? { ordering: orderingFor(item, snapshot) } : {}),
         });
-        rows.push({ item, result, failures: score(item, result, allowedPrices) });
+        rows.push({ item, result, failures: score(item, result, allowedPrices, bankAccount) });
       }
     }),
   );
@@ -112,6 +158,10 @@ async function runModel(model: string, cases: EvalCase[], apiKey: string, retrie
       cases: rows.length,
       passed: rows.filter((row) => row.failures.length === 0).length,
       wrong_price: count("wrong_price"),
+      ordering: orderingOn ? "on" : "off",
+      unwanted_confirm: count("unwanted_confirm"),
+      order_step_mismatch: count("order_step_mismatch"),
+      bank_leak: count("bank_leak"),
       forbidden_text: count("forbidden_text"),
       missed_handoffs: count("should_hand_off"),
       answerable_rate: answerable.length ? answerable.filter((row) => row.failures.length === 0).length / answerable.length : 0,
@@ -127,6 +177,8 @@ async function runModel(model: string, cases: EvalCase[], apiKey: string, retrie
       text: row.item.text,
       failures: row.failures,
       action: row.result.action,
+      order: row.result.order?.kind ?? null,
+      tool_calls: row.result.tool_calls,
       reply: row.result.reply,
       model_reply: row.result.model_reply,
       blocked_by: row.result.blocked_by,
@@ -143,14 +195,16 @@ async function runModel(model: string, cases: EvalCase[], apiKey: string, retrie
 async function main() {
   const apiKey = process.env.OPENROUTER_API_KEY;
   const models = (argument("models") ?? process.env.OPENROUTER_MODEL ?? "").split(",").filter(Boolean);
-  const limit = Number(argument("limit") ?? CASES.length);
+  const orderingOnly = process.argv.includes("--ordering");
+  const pool: (EvalCase | OrderEvalCase)[] = orderingOnly ? ORDER_CASES : CASES;
+  const limit = Number(argument("limit") ?? pool.length);
   if (!apiKey || models.length === 0) {
     console.error("Set OPENROUTER_API_KEY in .env and pass --models vendor/model-a,vendor/model-b");
     process.exit(1);
   }
   // Take evenly spaced cases, so a small run covers every topic rather than only prices.
-  const step = Math.max(1, CASES.length / limit);
-  const cases = Array.from({ length: Math.min(limit, CASES.length) }, (_, index) => CASES[Math.floor(index * step)]!);
+  const step = Math.max(1, pool.length / limit);
+  const cases = Array.from({ length: Math.min(limit, pool.length) }, (_, index) => pool[Math.floor(index * step)]!);
   const embeddingModel = argument("embedding-model");
   const retrieval: RetrievalOption | undefined = process.argv.includes("--retrieval")
     ? {
@@ -167,7 +221,7 @@ async function main() {
     console.log(`Running ${cases.length} cases on ${model}${retrieval ? ` with ${retrieval.retriever.mode} retrieval` : ""}`);
     const report = await runModel(model, cases, apiKey, retrieval);
     summaries.push(report.summary);
-    const suffix = retrieval ? `__rag-${retrieval.retriever.mode}` : "";
+    const suffix = `${retrieval ? `__rag-${retrieval.retriever.mode}` : ""}${orderingOnly ? "__ordering" : ""}`;
     writeFileSync(`${outputDir}${model.replaceAll("/", "__")}${suffix}.json`, JSON.stringify(report, null, 2));
   }
   console.table(summaries);

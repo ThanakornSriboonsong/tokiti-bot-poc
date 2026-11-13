@@ -42,3 +42,15 @@ test("scoring catches each failure type", () => {
   assert.deepEqual(score({ ...base, expect: "answer" }, result({ reply: "450 บาทค่ะ" }), prices), ["wrong_price"]);
   assert.deepEqual(score({ ...base, expect: "answer" }, result({ reply: "590 บาทค่ะ" }), prices), []);
 });
+
+test("ordering checks catch a confirmation without a clear yes and a leaked account", async () => {
+  const { ORDER_CASES } = await import("./ordering_cases.ts");
+  const notYes = ORDER_CASES.find((item) => item.text === "เดี๋ยวก่อนนะคะ")!;
+  const quote = { status: "ready", lines: [], subtotal: 1180, shipping_fee: 50, total: 1230, signature: "x" };
+  const confirmed = result({ order: { kind: "confirm", draft_id: "d", quote }, reply: "ยอดชำระ 1,230 บาท" });
+  assert.ok(score(notYes, confirmed, new Set()).includes("unwanted_confirm"));
+  assert.ok(score(notYes, result({ reply: "โอนเข้า 000-0-00000-0" }), new Set(), "000-0-00000-0").includes("bank_leak"));
+  const yes = ORDER_CASES.find((item) => item.text === "ยืนยันค่ะ" && item.order === "confirm")!;
+  assert.deepEqual(score(yes, confirmed, new Set(), "000-0-00000-0"), [], "quote totals are allowed prices");
+  assert.ok(ORDER_CASES.length >= 30);
+});
