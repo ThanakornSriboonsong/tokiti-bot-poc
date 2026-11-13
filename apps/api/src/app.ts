@@ -20,6 +20,7 @@ import {
   type StockStatus,
 } from "@tokiti/core";
 import { getDraft, getPublished, publish, rollback, setDraft } from "./db.ts";
+import { applyOrderEffect, cancelOpenDrafts, sampleOrdering } from "./ordering.ts";
 
 const MAX_IMAGE_CHARS = 7_000_000; // about 5 MB once base64-encoded
 const STOCK_STATUSES: StockStatus[] = ["in_stock", "out_of_stock", "on_hold", "count_pending", "unknown"];
@@ -116,6 +117,7 @@ export function createApp({ db, model, stock, now = () => new Date(), password, 
   const app = new Hono();
   const stockProvider = loggedStock(db, stock ?? sampleStock(db));
   const orders = orderProvider(db);
+  const ordering = sampleOrdering(db, () => getPublished(db).snapshot);
   const chatsByDay = new Map<string, number>();
 
   // Render's health check can't log in, so this one route stays open and reveals nothing.
@@ -203,6 +205,7 @@ export function createApp({ db, model, stock, now = () => new Date(), password, 
       now: current,
       history: loadHistory(db, customerId),
       ...(retriever ? { retriever } : {}),
+      ...(snapshot.settings.ordering?.enabled ? { ordering } : {}),
     });
 
     if (preview) return c.json({ preview: true, result });
@@ -220,6 +223,7 @@ export function createApp({ db, model, stock, now = () => new Date(), password, 
       `history_reset:${body.customer_id}`,
       now().toISOString(),
     );
+    cancelOpenDrafts(db, body.customer_id, now().toISOString());
     return c.json({ ok: true });
   });
 
@@ -250,6 +254,11 @@ export function createApp({ db, model, stock, now = () => new Date(), password, 
 
     const status = { approve: "approved", edit: "edited", reject: "rejected" }[body.decision];
     const finalText = body.decision === "approve" ? result.reply : body.decision === "edit" ? body.text!.trim() : null;
+    // An order step counts only when its exact rendered text is sent. An edited summary or
+    // payment message is sent as plain text and changes nothing.
+    if (body.decision === "approve" && result.order && !applyOrderEffect(db, row.customer_id, result.order, now().toISOString())) {
+      return c.json({ error: "order_state_changed" }, 409);
+    }
     db.prepare("update replies set status = ?, final_text = ?, reason = ?, decided_at = ? where id = ?").run(
       status,
       finalText,

@@ -2,6 +2,16 @@ import { bangkokDate, buildSources, renderKnowledge } from "./knowledge.ts";
 import { LexicalRetriever, buildChunks, buildQuery, tokenize, type Retriever } from "./retrieval.ts";
 import { checkAnswer, customerRiskReasons } from "./safety.ts";
 import {
+  SLIP_RECEIVED_REPLY,
+  checkLines,
+  checkRecipient,
+  isClearYes,
+  renderPayment,
+  renderSummary,
+  type OrderEffect,
+  type OrderingProvider,
+} from "./ordering.ts";
+import {
   type RetrievalReport,
   TOPICS,
   type Action,
@@ -78,6 +88,69 @@ const SEARCH_TOOL: ToolDefinition = {
   },
 };
 
+const LINES_PARAM = {
+  type: "array",
+  items: {
+    type: "object",
+    additionalProperties: false,
+    required: ["sku", "qty"],
+    properties: { sku: { type: "string", description: "sku จาก product ในข้อมูลที่อนุมัติแล้ว" }, qty: { type: "integer" } },
+  },
+};
+
+const ORDER_TOOLS: ToolDefinition[] = [
+  {
+    type: "function",
+    function: {
+      name: "quote_order",
+      description: "คิดราคารวมและค่าส่งจริงของรายการที่ลูกค้าอยากสั่ง ใช้เมื่อลูกค้าถามยอดรวมหรือค่าส่งของรายการนั้น",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["lines", "postcode"],
+        properties: { lines: LINES_PARAM, postcode: { type: ["string", "null"], description: "รหัสไปรษณีย์ 5 หลักถ้าลูกค้าให้มา" } },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "prepare_order_summary",
+      description: "เมื่อรู้สินค้า จำนวน ชื่อผู้รับ เบอร์โทร ที่อยู่ และรหัสไปรษณีย์ครบแล้ว ระบบจะส่งสรุปออเดอร์ให้ลูกค้าเอง",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["lines", "recipient"],
+        properties: {
+          lines: LINES_PARAM,
+          recipient: {
+            type: "object",
+            additionalProperties: false,
+            required: ["name", "phone", "address", "postcode"],
+            properties: { name: { type: "string" }, phone: { type: "string" }, address: { type: "string" }, postcode: { type: "string" } },
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "confirm_order",
+      description: "ลูกค้าตอบยืนยันสรุปออเดอร์ล่าสุดชัดเจน ระบบจะตรวจและส่งยอดกับบัญชีโอนให้ลูกค้าเอง",
+      parameters: { type: "object", additionalProperties: false, properties: {} },
+    },
+  },
+];
+
+const ORDER_RULES = `
+- ลูกค้าอยากสั่งซื้อ ให้ถามสิ่งที่ยังขาดทีละเรื่อง: สินค้าและสี จำนวน ชื่อผู้รับ เบอร์โทร ที่อยู่ รหัสไปรษณีย์ ใช้ action=ask_followup topic=order
+- ใช้ sku จาก product ในข้อมูลที่อนุมัติแล้วเท่านั้น ถ้าไม่แน่ใจว่าสินค้าตัวไหนให้ถามกลับ
+- ข้อมูลครบแล้วให้เรียก prepare_order_summary ระบบจะส่งสรุปเอง แล้วตอบ action=answer topic=order
+- หลังสรุป ถ้าลูกค้าตอบยืนยันชัดเจน ให้เรียก confirm_order ระบบจะส่งยอดและบัญชีโอนเอง แล้วตอบ action=answer topic=order
+- ห้ามพิมพ์ยอดรวม ค่าส่งรวม เลขบัญชี หรือวิธีโอนเงินเอง
+- ถ้าเครื่องมือตอบ error ให้ถามลูกค้าเรื่องที่ขาด หรือ handoff ถ้าแก้ไม่ได้`;
+
 export const DEFAULT_TOP_K = 6;
 const MAX_SEARCH_CHARS = 200;
 /** Sources a tool's answer depends on, so retrieval can't leave them out. */
@@ -91,7 +164,7 @@ const RETRIEVAL_RULES = `
 - ถ้าข้อมูลที่ต้องใช้ไม่อยู่ด้านล่าง ให้เรียก search_knowledge ก่อน handoff
 - อ้าง source_ids ได้เฉพาะ id ที่เห็นในข้อมูลด้านล่างหรือในผลจากเครื่องมือ`;
 
-function systemPrompt(knowledge: string, today: string, retrieval = false): string {
+function systemPrompt(knowledge: string, today: string, retrieval = false, ordering = false): string {
   return `คุณช่วยร่างคำตอบแชท LINE ของร้าน TOKITI ทีมงานจะตรวจก่อนส่งเสมอ
 
 น้ำเสียง: เหมือนแอดมินวัยรุ่นที่รักแมว พิมพ์แบบชิล ๆ เป็นกันเอง แต่ยังสุภาพเสมอ
@@ -126,7 +199,7 @@ function systemPrompt(knowledge: string, today: string, retrieval = false): stri
 - ถามเรื่องการจัดส่ง ให้ตอบข้อมูลที่มีจาก faq:shipping เช่น ขนส่งและวิธีคิดค่าส่ง พร้อมบอกว่ายังยืนยันวันถึงไม่ได้ ไม่ต้อง handoff ยกเว้นลูกค้าต้องการให้ยืนยันวันถึง
 - ทุกตัวเลขในคำตอบต้องมีอยู่ในข้อมูลที่อ้างใน source_ids ถ้าบอกจำนวนสี ให้อ้าง spec:nest
 - ถ้าคำถามกำกวม ใช้ action=ask_followup ถามกลับ 1 คำถาม
-- confidence คือความมั่นใจ 0 ถึง 1${retrieval ? RETRIEVAL_RULES : ""}
+- confidence คือความมั่นใจ 0 ถึง 1${retrieval ? RETRIEVAL_RULES : ""}${ordering ? ORDER_RULES : ""}
 
 ตอบเป็น JSON ตาม schema เท่านั้น
 
@@ -192,6 +265,8 @@ export interface PipelineDeps {
   history?: HistoryTurn[];
   /** Used when settings.retrieval is on. Defaults to word search, which needs no key. */
   retriever?: Retriever;
+  /** Chat ordering. Without it the bot only answers questions. */
+  ordering?: OrderingProvider;
 }
 
 export async function answerMessage(
@@ -225,8 +300,77 @@ export async function answerMessage(
   const toolCalls: string[] = [];
   const usage: Usage = { prompt_tokens: 0, completion_tokens: 0, cost: null };
   let modelName: string | null = null;
+  const ordering = deps.ordering;
+  const knownSkus = new Set(deps.snapshot.products.map((product) => product.sku));
+  // The order change this reply needs, and the code-rendered text that goes with it.
+  let effect: OrderEffect | null = null;
+  let effectReply: string | null = null;
+  const args = (call: ToolCall): Record<string, unknown> => {
+    try {
+      const value = JSON.parse(call.function.arguments || "{}") as unknown;
+      return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const runOrderTool = async (call: ToolCall): Promise<string> => {
+    if (!ordering) return JSON.stringify({ error: "unknown_tool" });
+    const input = args(call);
+    if (call.function.name === "quote_order") {
+      const lines = checkLines(input.lines, knownSkus);
+      if (!lines) return JSON.stringify({ error: "invalid_lines" });
+      const postcode = typeof input.postcode === "string" && /^\d{5}$/.test(input.postcode) ? input.postcode : null;
+      const { signature: _hidden, ...quote } = await ordering.quote(lines, postcode);
+      sources.set("quote:latest", JSON.stringify(quote));
+      return JSON.stringify({ id: "quote:latest", ...quote });
+    }
+    if (call.function.name === "prepare_order_summary") {
+      const lines = checkLines(input.lines, knownSkus);
+      if (!lines) return JSON.stringify({ error: "invalid_lines" });
+      const recipient = checkRecipient(input.recipient);
+      if (!recipient.ok) return JSON.stringify({ error: "missing_recipient", missing: recipient.missing });
+      const quote = await ordering.quote(lines, recipient.recipient.postcode);
+      if (quote.status !== "ready") return JSON.stringify({ error: quote.status });
+      const draft = await ordering.current(customerId);
+      if (draft && !["collecting", "summary_sent"].includes(draft.state)) return JSON.stringify({ error: "order_in_progress" });
+      const summary = renderSummary(quote, recipient.recipient);
+      effect = { kind: "summary", draft_id: draft?.id ?? null, lines, recipient: recipient.recipient, quote, summary_text: summary };
+      effectReply = summary;
+      return JSON.stringify({ ok: true, note: "ระบบจะส่งสรุปให้ลูกค้าเอง" });
+    }
+    if (call.function.name === "confirm_order") {
+      const draft = await ordering.current(customerId);
+      if (!draft || draft.state !== "summary_sent" || !draft.quote || !draft.recipient) return JSON.stringify({ error: "no_summary" });
+      if (!draft.summary_is_latest) return JSON.stringify({ error: "summary_not_latest" });
+      if (!isClearYes(message.text)) return JSON.stringify({ error: "not_a_clear_yes" });
+      const fresh = await ordering.quote(draft.lines, draft.recipient.postcode);
+      if (fresh.status !== "ready") return JSON.stringify({ error: fresh.status });
+      if (fresh.signature !== draft.quote.signature) {
+        // Prices, shipping or stock changed since the summary, so the customer must see the new one.
+        const summary = renderSummary(fresh, draft.recipient);
+        effect = { kind: "summary", draft_id: draft.id, lines: draft.lines, recipient: draft.recipient, quote: fresh, summary_text: summary };
+        effectReply = summary;
+        return JSON.stringify({ error: "quote_changed", note: "ระบบจะส่งสรุปใหม่ให้ลูกค้าเอง" });
+      }
+      const bank = await ordering.bank();
+      if (!bank) return JSON.stringify({ error: "bank_unavailable" });
+      effect = { kind: "confirm", draft_id: draft.id, quote: fresh };
+      effectReply = renderPayment(fresh, bank);
+      return JSON.stringify({ ok: true, note: "ระบบจะส่งยอดและบัญชีโอนให้ลูกค้าเอง" });
+    }
+    return JSON.stringify({ error: "unknown_tool" });
+  };
 
   const runTool = async (call: ToolCall): Promise<string> => {
+    if (["quote_order", "prepare_order_summary", "confirm_order"].includes(call.function.name)) {
+      toolCalls.push(call.function.name);
+      try {
+        return await runOrderTool(call);
+      } catch {
+        return JSON.stringify({ error: "ordering_unavailable" });
+      }
+    }
     toolCalls.push(call.function.name);
     if (call.function.name === "get_stock") {
       let skus: string[] = [];
@@ -294,6 +438,18 @@ export async function answerMessage(
     };
   };
 
+  // A picture while the order waits for payment is treated as the slip. Staff check it; the
+  // bot only says it arrived, without calling the model.
+  if (ordering && message.image_url) {
+    const draft = await ordering.current(customerId).catch(() => null);
+    if (draft?.state === "awaiting_slip") {
+      return {
+        ...finish({ action: "answer", topic: "order", reply_th: SLIP_RECEIVED_REPLY, source_ids: [], confidence: 1 }, []),
+        order: { kind: "slip", draft_id: draft.id },
+      };
+    }
+  }
+
   const riskReasons = customerRiskReasons(message.text);
   if (riskReasons.length > 0) return { ...finish(null, riskReasons), topic: "risky" };
 
@@ -327,9 +483,9 @@ export async function answerMessage(
 
   // With every source sent, the prompt and tools are the same as with retrieval off.
   const narrowed = retrievalOn && report?.sent_all === false;
-  const tools = narrowed ? [...TOOLS, SEARCH_TOOL] : TOOLS;
+  const tools = [...TOOLS, ...(narrowed ? [SEARCH_TOOL] : []), ...(ordering ? ORDER_TOOLS : [])];
   const messages: ChatMessage[] = [
-    { role: "system", content: systemPrompt(renderKnowledge(sources), bangkokDate(now), narrowed) },
+    { role: "system", content: systemPrompt(renderKnowledge(sources), bangkokDate(now), narrowed, !!ordering) },
     { role: "user", content: userContent(message, history) },
   ];
 
@@ -344,6 +500,14 @@ export async function answerMessage(
       if (response.tool_calls.length === 0) {
         const answer = parseAnswer(response.content);
         if (!answer) return finish(null, ["invalid_model_output"]);
+        // An order step replaces the model's text with the rendered summary or payment details,
+        // whose numbers all come from the quote. A handoff from the model cancels the step.
+        if (effect && effectReply && answer.action !== "handoff") {
+          return {
+            ...finish({ ...answer, action: "answer", topic: "order", reply_th: effectReply }, []),
+            order: effect,
+          };
+        }
         const reasons = checkAnswer({
           answer,
           customerText: message.text,

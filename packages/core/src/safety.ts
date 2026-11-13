@@ -58,6 +58,8 @@ const FORBIDDEN_REPLY: { pattern: RegExp; reason: string }[] = [
   { pattern: /รับประกัน|การันตี|รักษา|ป้องกันเชื้อรา|ฆ่าเชื้อ/, reason: "promise_claim" },
   { pattern: /บ้านแมว/, reason: "wrong_product_name" },
   { pattern: /iShip|order_status|parcel|\bsync\b/i, reason: "internal_term" },
+  // Bank details are rendered by ordering.ts from the shop's settings, never written by the model.
+  { pattern: /เลขบัญชี|เลขที่บัญชี|พร้อมเพย์|promptpay|\d{3}-\d-\d{5}-\d/i, reason: "bank_details_from_model" },
 ];
 
 // The lookahead keeps product talk like "มีของใช้สำหรับน้องแมว" from counting as a stock claim.

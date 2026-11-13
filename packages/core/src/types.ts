@@ -1,3 +1,5 @@
+import type { OrderEffect } from "./ordering.ts";
+
 export const TOPICS = [
   "price_promo",
   "delivery",
@@ -6,6 +8,7 @@ export const TOPICS = [
   "order_tracking",
   "image",
   "review",
+  "order",
   "risky",
   "other",
 ] as const;
@@ -64,6 +67,8 @@ export interface Settings {
   min_confidence: number;
   /** Off or missing: every approved source goes in the prompt. On: only the top matches. */
   retrieval?: { enabled: boolean; top_k: number };
+  /** On: the bot can take an order, send the payment details and record the slip. */
+  ordering?: { enabled: boolean };
 }
 
 export interface RetrievalReport {
@@ -190,5 +195,7 @@ export interface BotResult {
   latency_ms: number;
   history_count: number;
   retrieval?: RetrievalReport;
+  /** Set when the reply needs a stored order change. The app stores it before sending, or sends nothing. */
+  order?: OrderEffect;
   error?: string;
 }

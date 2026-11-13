@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import type { Order, Snapshot, StockStatus } from "@tokiti/core";
+import { ORDER_SCHEMA, setOrderingConfig, type SampleOrderingConfig } from "./ordering.ts";
 
 export const SEED_PATH = fileURLToPath(new URL("../../../data/seed/sample.json", import.meta.url));
 export const DB_PATH = fileURLToPath(new URL("../../../data/poc.db", import.meta.url));
@@ -9,6 +10,7 @@ export const DB_PATH = fileURLToPath(new URL("../../../data/poc.db", import.meta
 interface Seed extends Snapshot {
   stock: { sku: string; status: StockStatus; restock_date: string | null }[];
   orders: (Order & { customer_id: string })[];
+  ordering?: SampleOrderingConfig;
 }
 
 const SCHEMA = `
@@ -57,6 +59,7 @@ create table if not exists stock_reads(
 export function openDb(path: string): DatabaseSync {
   const db = new DatabaseSync(path);
   db.exec(SCHEMA);
+  db.exec(ORDER_SCHEMA);
   return db;
 }
 
@@ -68,7 +71,8 @@ export function seedDb(db: DatabaseSync, seed: Seed = JSON.parse(readFileSync(SE
     faqs: seed.faqs,
     settings: seed.settings,
   };
-  db.exec("delete from kv; delete from versions; delete from stock; delete from orders; delete from replies; delete from stock_reads;");
+  db.exec("delete from kv; delete from versions; delete from stock; delete from orders; delete from replies; delete from stock_reads; delete from order_drafts;");
+  setOrderingConfig(db, seed.ordering ?? { shipping_fee: 0, bank: null });
   setDraft(db, snapshot);
   publish(db, "ข้อมูลตัวอย่าง");
   const insertStock = db.prepare("insert into stock(sku, status, restock_date) values (?, ?, ?)");

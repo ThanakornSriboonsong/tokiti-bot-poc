@@ -5,3 +5,4 @@ export * from "./model.ts";
 export * from "./safety.ts";
 export * from "./pipeline.ts";
 export * from "./retrieval.ts";
+export * from "./ordering.ts";

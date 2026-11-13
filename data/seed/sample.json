@@ -1,5 +1,5 @@
 {
-  "_note": "SAMPLE DATA. Copied from public seed files in tokiti-web dated 27 Oct 2026. Every value needs Kin's confirmation before real use.",
+  "_note": "SAMPLE DATA. Copied from public seed files in tokiti-web dated 27 Oct 2026. Every value needs Kin's confirmation before real use. Ordering values (shipping_fee, bank) are EXAMPLE placeholders, not a real account.",
   "products": [
     { "sku": "TK101", "name": "TOKITI Nest ที่นอนแมว", "color": "Snow White", "regular_price": 899, "online_price": 590, "booth_price": 490, "spec_id": "nest", "needs_review": true },
     { "sku": "TK102", "name": "TOKITI Nest ที่นอนแมว", "color": "Latte Beige", "regular_price": 899, "online_price": 590, "booth_price": 490, "spec_id": "nest", "needs_review": true },
@@ -28,9 +28,10 @@
   "settings": {
     "enabled": true,
     "bot_hours": { "start": "23:00", "end": "09:00" },
-    "topics": ["price_promo", "delivery", "size_weight", "stock_restock", "order_tracking", "image", "review"],
+    "topics": ["price_promo", "delivery", "size_weight", "stock_restock", "order_tracking", "image", "review", "order"],
     "min_confidence": 0.5,
-    "retrieval": { "enabled": false, "top_k": 6 }
+    "retrieval": { "enabled": false, "top_k": 6 },
+    "ordering": { "enabled": true }
   },
   "stock": [
     { "sku": "TK101", "status": "in_stock", "restock_date": null },
@@ -42,5 +43,6 @@
   "orders": [
     { "customer_id": "demo-a", "code": "WEB-DEMO-0001", "state": "กำลังจัดส่ง", "carrier": "SPX Express", "tracking": "DEMO123456" },
     { "customer_id": "demo-b", "code": "WEB-DEMO-0002", "state": "รอตรวจการชำระเงิน", "carrier": null, "tracking": null }
-  ]
+  ],
+  "ordering": { "shipping_fee": 50, "bank": { "bank_name": "EXAMPLE ธนาคารตัวอย่าง", "account": "000-0-00000-0", "holder": "EXAMPLE TOKITI" } }
 }
